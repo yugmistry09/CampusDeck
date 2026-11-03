@@ -1,0 +1,35 @@
+# Node
+node_modules/
+npm-debug.log*
+.npm
+
+# Build outputs
+out/
+dist/
+
+# Electron builder artifacts
+dist-electron/
+release/
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Editor
+.vscode/
+.idea/
+*.iml
+
+# App data (never commit)
+*.db
+*.db-wal
+*.db-shm
+
+# Coverage
+coverage/
+.nyc_output/
+
+# TypeScript incremental
+*.tsbuildinfo
