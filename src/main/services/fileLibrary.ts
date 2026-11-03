@@ -1,9 +1,61 @@
 import { copyFileSync, existsSync, mkdirSync, unlinkSync, statSync } from 'fs'
-import { basename, join } from 'path'
+import { basename, extname, resolve } from 'path'
+import { dialog, shell, BrowserWindow } from 'electron'
 import { v4 as uuidv4 } from 'uuid'
 import type { DocumentRepo, DocumentCreateInput } from '../db/repositories/documents'
-import type { DocumentRow, TaskDocumentRole } from '../db/schema'
+import type { SubjectDocRepo } from '../db/repositories/subjectDocs'
+import type { DocumentRow, TaskDocumentRole, SubjectDocumentType, SubjectDocumentRecord } from '../../shared/types'
 import { getAppPaths } from '../utils/paths'
+
+// ---------------------------------------------------------------------------
+// Supported File Types Configuration
+// Supports PDFs, images, Office formats, and plain text files.
+// ---------------------------------------------------------------------------
+
+export const SUPPORTED_EXTENSIONS_MAP: Record<string, string> = {
+  // PDF
+  '.pdf': 'application/pdf',
+
+  // Images
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml',
+  '.bmp': 'image/bmp',
+
+  // Office Documents
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.doc': 'application/msword',
+  '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  '.ppt': 'application/vnd.ms-powerpoint',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.xls': 'application/vnd.ms-excel',
+  '.odt': 'application/vnd.oasis.opendocument.text',
+  '.ods': 'application/vnd.oasis.opendocument.spreadsheet',
+  '.odp': 'application/vnd.oasis.opendocument.presentation',
+
+  // Text
+  '.txt': 'text/plain',
+  '.md': 'text/markdown',
+  '.csv': 'text/csv',
+  '.rtf': 'application/rtf'
+}
+
+export function isSupportedFileType(filename: string): boolean {
+  const ext = extname(filename).toLowerCase()
+  return ext in SUPPORTED_EXTENSIONS_MAP
+}
+
+export function getMimeType(filename: string): string {
+  const ext = extname(filename).toLowerCase()
+  return SUPPORTED_EXTENSIONS_MAP[ext] || 'application/octet-stream'
+}
+
+export function sanitizeFilename(name: string): string {
+  return name.replace(/[^a-zA-Z0-9._-]/g, '_')
+}
 
 // ---------------------------------------------------------------------------
 // File Library Service
@@ -13,11 +65,10 @@ import { getAppPaths } from '../utils/paths'
 // relative to the library root (D-004, D-005).
 // ---------------------------------------------------------------------------
 
-function sanitizeFilename(name: string): string {
-  return name.replace(/[^a-zA-Z0-9._-]/g, '_')
-}
-
-export function createFileLibraryService(documentRepo: DocumentRepo) {
+export function createFileLibraryService(
+  documentRepo: DocumentRepo,
+  subjectDocRepo?: SubjectDocRepo
+) {
   const { libraryRoot } = getAppPaths()
 
   function ensureLibraryExists(): void {
@@ -26,7 +77,70 @@ export function createFileLibraryService(documentRepo: DocumentRepo) {
     }
   }
 
+  function assertSafeRelativePath(relativePath: string): string {
+    const fullPath = resolve(libraryRoot, relativePath)
+    const normalizedRoot = resolve(libraryRoot)
+    if (!fullPath.startsWith(normalizedRoot)) {
+      throw new Error(`Path traversal attempt detected: ${relativePath}`)
+    }
+    return fullPath
+  }
+
   return {
+    /**
+     * Displays native open file dialog for user selection.
+     */
+    async showNativeFileDialog(parentWindow?: BrowserWindow | null): Promise<{
+      canceled: boolean
+      filePath?: string
+      fileName?: string
+      fileSize?: number
+      mimeType?: string
+    }> {
+      const allowedExtensions = Object.keys(SUPPORTED_EXTENSIONS_MAP).map((ext) =>
+        ext.replace('.', '')
+      )
+
+      const win = parentWindow || BrowserWindow.getFocusedWindow() || undefined
+      const result = await dialog.showOpenDialog(win!, {
+        title: 'Select Academic Document',
+        properties: ['openFile'],
+        filters: [
+          {
+            name: 'All Supported Academic Documents',
+            extensions: allowedExtensions
+          },
+          { name: 'PDF Documents (*.pdf)', extensions: ['pdf'] },
+          { name: 'Images (*.png, *.jpg, *.jpeg, *.webp)', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'] },
+          { name: 'Office Documents (*.docx, *.pptx, *.xlsx)', extensions: ['docx', 'doc', 'pptx', 'ppt', 'xlsx', 'xls', 'odt'] },
+          { name: 'Text Documents (*.txt, *.md, *.csv)', extensions: ['txt', 'md', 'csv', 'rtf'] },
+          { name: 'All Files', extensions: ['*'] }
+        ]
+      })
+
+      if (result.canceled || result.filePaths.length === 0) {
+        return { canceled: true }
+      }
+
+      const filePath = result.filePaths[0]!
+      const fileName = basename(filePath)
+
+      if (!isSupportedFileType(fileName)) {
+        throw new Error(
+          `Unsupported file format "${extname(fileName)}". Supported formats: PDF, Images, Word, PowerPoint, Excel, and Text.`
+        )
+      }
+
+      const stats = statSync(filePath)
+      return {
+        canceled: false,
+        filePath,
+        fileName,
+        fileSize: stats.size,
+        mimeType: getMimeType(fileName)
+      }
+    },
+
     /**
      * Imports an external file into the managed local library.
      * The original file is preserved; a copy is created with a unique UUID-prefixed name.
@@ -46,25 +160,95 @@ export function createFileLibraryService(documentRepo: DocumentRepo) {
       ensureLibraryExists()
 
       const originalName = options?.displayName || basename(sourcePath)
-      const sanitized = sanitizeFilename(originalName)
-      const uniqueFileName = `${uuidv4()}_${sanitized}`
-      const destinationPath = join(libraryRoot, uniqueFileName)
 
-      // Copy into managed library
-      copyFileSync(sourcePath, destinationPath)
-
-      // Get size
-      const stats = statSync(destinationPath)
-
-      // Record in documents table with relative path
-      const docInput: DocumentCreateInput = {
-        display_name: originalName,
-        relative_path: uniqueFileName, // Relative to libraryRoot
-        mime_type: options?.mimeType || 'application/pdf',
-        size_bytes: stats.size
+      if (!isSupportedFileType(originalName)) {
+        throw new Error(
+          `Unsupported file type for "${originalName}". Only PDFs, Images, Office documents, and Text files are accepted.`
+        )
       }
 
-      return documentRepo.createDocument(docInput)
+      const sanitized = sanitizeFilename(originalName)
+      const uniqueFileName = `${uuidv4()}_${sanitized}`
+      const destinationPath = assertSafeRelativePath(uniqueFileName)
+
+      // Copy into managed library
+      try {
+        copyFileSync(sourcePath, destinationPath)
+      } catch (err) {
+        throw new Error(`Failed to copy file into managed library: ${err instanceof Error ? err.message : String(err)}`)
+      }
+
+      let stats: { size: number }
+      try {
+        stats = statSync(destinationPath)
+      } catch (err) {
+        if (existsSync(destinationPath)) unlinkSync(destinationPath)
+        throw new Error(`Failed to read imported file metadata: ${err instanceof Error ? err.message : String(err)}`)
+      }
+
+      try {
+        const docInput: DocumentCreateInput = {
+          display_name: originalName,
+          relative_path: uniqueFileName,
+          mime_type: options?.mimeType || getMimeType(originalName),
+          size_bytes: stats.size
+        }
+        return documentRepo.createDocument(docInput)
+      } catch (dbErr) {
+        // Rollback disk copy on DB failure to avoid orphaned files
+        if (existsSync(destinationPath)) {
+          try {
+            unlinkSync(destinationPath)
+          } catch {
+            // ignore cleanup error
+          }
+        }
+        throw dbErr
+      }
+    },
+
+    /**
+     * Atomically imports a file and creates a subject document record.
+     */
+    importSubjectDocument(
+      subjectId: string,
+      sourcePath: string,
+      metadata: {
+        title: string
+        type: SubjectDocumentType
+        description?: string
+      }
+    ): SubjectDocumentRecord {
+      if (!subjectDocRepo) {
+        throw new Error('subjectDocRepo not configured in FileLibraryService')
+      }
+
+      // Import file into library
+      const doc = this.importFile(sourcePath)
+
+      try {
+        subjectDocRepo.create({
+          subject_id: subjectId,
+          document_id: doc.id,
+          type: metadata.type,
+          title: metadata.title.trim() || doc.display_name,
+          description: metadata.description?.trim() || ''
+        })
+
+        const created = subjectDocRepo.getById(doc.id)
+        if (!created) {
+          // Fallback query by subject
+          const list = subjectDocRepo.listBySubject(subjectId)
+          const found = list.find((d) => d.document_id === doc.id)
+          if (found) return found
+          throw new Error('Failed to retrieve created subject document')
+        }
+        return created
+      } catch (err) {
+        // Clean up document and file if subject document creation fails
+        this.deleteDocument(doc.id)
+        throw err
+      }
     },
 
     /**
@@ -101,22 +285,46 @@ export function createFileLibraryService(documentRepo: DocumentRepo) {
       documentRepo.deleteDocument(documentId)
 
       // Delete physical file from managed library
-      const absolutePath = join(libraryRoot, doc.relative_path)
-      if (existsSync(absolutePath)) {
+      const fullPath = assertSafeRelativePath(doc.relative_path)
+      if (existsSync(fullPath)) {
         try {
-          unlinkSync(absolutePath)
+          unlinkSync(fullPath)
         } catch (err) {
-          console.warn(`[FileLibrary] Failed to delete file: ${absolutePath}`, err)
+          console.warn(`[FileLibrary] Failed to delete file: ${fullPath}`, err)
         }
       }
     },
 
     /**
+     * Opens a document in the OS default application via its validated document ID.
+     * React NEVER supplies raw machine paths.
+     */
+    async openDocumentInDefaultApp(documentId: string): Promise<void> {
+      const doc = documentRepo.getDocumentById(documentId)
+      if (!doc) {
+        throw new Error(`Document with ID "${documentId}" was not found.`)
+      }
+
+      const fullPath = assertSafeRelativePath(doc.relative_path)
+
+      if (!existsSync(fullPath)) {
+        throw new Error(
+          `The file "${doc.display_name}" is missing from the local vault storage. It may have been deleted externally.`
+        )
+      }
+
+      const error = await shell.openPath(fullPath)
+      if (error) {
+        throw new Error(`Could not open file in default application: ${error}`)
+      }
+    },
+
+    /**
      * Resolves the absolute path for a relative path strictly within libraryRoot.
-     * Only used by main process (e.g. streaming to offline PDF viewer).
+     * Only used by main process.
      */
     toAbsolutePath(relativePath: string): string {
-      return join(libraryRoot, relativePath)
+      return assertSafeRelativePath(relativePath)
     }
   }
 }

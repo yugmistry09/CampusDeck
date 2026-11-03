@@ -1,8 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
   SubjectRow,
+  SubjectWithStats,
   TaskRow,
   SubjectDocumentRow,
+  SubjectDocumentRecord,
   AppSettings,
   CompletionResult,
   SubjectCreateInput,
@@ -10,7 +12,8 @@ import type {
   TaskCreateInput,
   TaskUpdateInput,
   TaskListOptions,
-  SubjectDocumentCreateInput
+  SubjectDocumentCreateInput,
+  ImportSubjectDocInput
 } from '../shared/types'
 
 // ---------------------------------------------------------------------------
@@ -34,7 +37,9 @@ function invoke<T>(channel: string, payload?: unknown): Promise<T> {
 const api = {
   subjects: {
     list: () => invoke<SubjectRow[]>('subject:list'),
+    listWithStats: () => invoke<SubjectWithStats[]>('subject:list-with-stats'),
     get: (id: string) => invoke<SubjectRow | null>('subject:get', { id }),
+    getWithStats: (id: string) => invoke<SubjectWithStats | null>('subject:get-with-stats', { id }),
     create: (input: SubjectCreateInput) => invoke<SubjectRow>('subject:create', input),
     update: (input: SubjectUpdateInput) => invoke<SubjectRow | null>('subject:update', input),
     delete: (id: string) => invoke<void>('subject:delete', { id })
@@ -55,10 +60,22 @@ const api = {
 
   subjectDocs: {
     list: (subjectId: string) =>
-      invoke<SubjectDocumentRow[]>('subject-doc:list', { subjectId }),
+      invoke<SubjectDocumentRecord[]>('subject-doc:list', { subjectId }),
+    listAll: () =>
+      invoke<SubjectDocumentRecord[]>('subject-doc:list-all'),
     create: (input: SubjectDocumentCreateInput) =>
       invoke<SubjectDocumentRow>('subject-doc:create', input),
     delete: (id: string) => invoke<void>('subject-doc:delete', { id })
+  },
+
+  files: {
+    selectAndImportSubjectDoc: (input: ImportSubjectDocInput) =>
+      invoke<{ canceled: boolean; document?: SubjectDocumentRecord }>(
+        'file:select-and-import-subject-doc',
+        input
+      ),
+    openDocument: (documentId: string) =>
+      invoke<{ success: boolean }>('file:open-document', { documentId })
   },
 
   settings: {

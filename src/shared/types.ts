@@ -21,9 +21,12 @@ export type TaskFileRole = TaskDocumentRole
 
 export type SubjectDocumentType =
   | 'syllabus'
+  | 'marks'
   | 'marks_scheme'
   | 'notice'
+  | 'reference'
   | 'timetable'
+  | 'notes'
   | 'other'
 
 export type Theme = 'light' | 'dark' | 'system'
@@ -39,8 +42,17 @@ export interface SubjectRow {
   name: string
   code: string | null
   color: string | null
+  semester: string | null
+  notes: string
   created_at: string
   updated_at: string
+}
+
+export interface SubjectWithStats extends SubjectRow {
+  totalTasks: number
+  completedTasks: number
+  completionPercent: number
+  totalFiles: number
 }
 
 export interface TaskRow {
@@ -86,6 +98,26 @@ export interface SubjectDocumentRow {
   description: string
   created_at: string
   updated_at: string
+}
+
+export interface SubjectDocumentRecord {
+  id: string
+  subject_id: string
+  document_id: string | null
+  type: SubjectDocumentType
+  title: string
+  description: string
+  created_at: string
+  updated_at: string
+  // Attached document metadata (if present)
+  display_name?: string | null
+  relative_path?: string | null
+  mime_type?: string | null
+  size_bytes?: number | null
+  // Associated subject metadata
+  subject_name?: string | null
+  subject_code?: string | null
+  subject_color?: string | null
 }
 
 export interface SettingRow {
@@ -136,6 +168,8 @@ export interface SubjectCreateInput {
   name: string
   code?: string | null
   color?: string | null
+  semester?: string | null
+  notes?: string
 }
 
 export interface SubjectUpdateInput {
@@ -143,6 +177,8 @@ export interface SubjectUpdateInput {
   name?: string
   code?: string | null
   color?: string | null
+  semester?: string | null
+  notes?: string
 }
 
 export interface TaskCreateInput {
@@ -186,5 +222,12 @@ export interface SubjectDocumentUpdateInput {
   document_id?: string | null
   type?: SubjectDocumentType
   title?: string
+  description?: string
+}
+
+export interface ImportSubjectDocInput {
+  subjectId: string
+  title: string
+  type: SubjectDocumentType
   description?: string
 }
