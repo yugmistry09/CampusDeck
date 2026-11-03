@@ -170,7 +170,7 @@ describe('Task Repository', () => {
     const s2 = subjectRepo.create({ name: 'Subject 2' })
 
     const t1 = taskRepo.create({ subject_id: s1.id, type: 'assignment', title: 'S1 T1' })
-    const t2 = taskRepo.create({ subject_id: s1.id, type: 'assignment', title: 'S1 T2' })
+    taskRepo.create({ subject_id: s1.id, type: 'assignment', title: 'S1 T2' })
     const t3 = taskRepo.create({ subject_id: s2.id, type: 'assignment', title: 'S2 T1' })
 
     taskRepo.update({ id: t1.id, status: 'completed' })
