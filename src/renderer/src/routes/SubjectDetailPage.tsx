@@ -8,17 +8,22 @@ import {
   FileText,
   ExternalLink,
   CheckCircle2,
-  FileCheck
+  FileCheck,
+  Plus
 } from 'lucide-react'
 import type {
   SubjectWithStats,
   SubjectRow,
   SubjectDocumentRecord,
-  SubjectDocumentType
+  SubjectDocumentType,
+  TaskWithSubject,
+  TaskStatus
 } from '@shared/types'
 import { SubjectModal } from '../components/SubjectModal'
 import { DocumentUploadModal } from '../components/DocumentUploadModal'
 import { ConfirmModal } from '../components/ConfirmModal'
+import { TaskCard } from '../components/TaskCard'
+import { TaskModal } from '../components/TaskModal'
 
 interface SubjectDetailPageProps {
   subjectId: string
@@ -78,13 +83,20 @@ export const SubjectDetailPage: React.FC<SubjectDetailPageProps> = ({
 }) => {
   const [subject, setSubject] = useState<SubjectWithStats | null>(null)
   const [documents, setDocuments] = useState<SubjectDocumentRecord[]>([])
+  const [tasks, setTasks] = useState<TaskWithSubject[]>([])
   const [activeTab, setActiveTab] = useState<TabMode>('overview')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  const [taskStatusFilter, setTaskStatusFilter] = useState<'all' | 'todo' | 'in_progress' | 'completed'>('all')
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [docToDelete, setDocToDelete] = useState<SubjectDocumentRecord | null>(null)
+
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
+  const [editingTask, setEditingTask] = useState<TaskWithSubject | null>(null)
+  const [taskToArchive, setTaskToArchive] = useState<TaskWithSubject | null>(null)
+  const [taskToDelete, setTaskToDelete] = useState<TaskWithSubject | null>(null)
 
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
@@ -95,6 +107,9 @@ export const SubjectDetailPage: React.FC<SubjectDetailPageProps> = ({
 
       const docs = await window.campusDeskAPI.subjectDocs.list(subjectId)
       setDocuments(docs)
+
+      const subTasks = await window.campusDeskAPI.tasks.list({ subjectId, includeArchived: true })
+      setTasks(subTasks)
     } catch (err) {
       console.error('Failed to load subject details:', err)
       setNotification({
@@ -152,6 +167,50 @@ export const SubjectDetailPage: React.FC<SubjectDetailPageProps> = ({
       })
     }
   }
+
+  const handleToggleTaskStatus = async (t: TaskWithSubject) => {
+    let next: TaskStatus
+    if (t.status === 'todo') next = 'in_progress'
+    else if (t.status === 'in_progress') next = 'completed'
+    else next = 'todo'
+    try {
+      await window.campusDeskAPI.tasks.update({ id: t.id, status: next })
+      loadSubjectData()
+      setNotification({ type: 'success', message: 'Task status updated.' })
+    } catch (err) {
+      setNotification({ type: 'error', message: 'Failed to update task status.' })
+    }
+  }
+
+  const handleArchiveTaskConfirm = async () => {
+    if (!taskToArchive) return
+    try {
+      await window.campusDeskAPI.tasks.archive(taskToArchive.id, taskToArchive.is_archived === 0)
+      setTaskToArchive(null)
+      loadSubjectData()
+      setNotification({ type: 'success', message: 'Task archive state updated.' })
+    } catch (err) {
+      setNotification({ type: 'error', message: 'Failed to update archive state.' })
+    }
+  }
+
+  const handleDeleteTaskConfirm = async () => {
+    if (!taskToDelete) return
+    try {
+      await window.campusDeskAPI.tasks.delete(taskToDelete.id)
+      setTaskToDelete(null)
+      loadSubjectData()
+      setNotification({ type: 'success', message: 'Task deleted.' })
+    } catch (err) {
+      setNotification({ type: 'error', message: 'Failed to delete task.' })
+    }
+  }
+
+  const filteredTasks = tasks.filter((t) => {
+    if (t.is_archived === 1) return false
+    if (taskStatusFilter === 'all') return true
+    return t.status === taskStatusFilter
+  })
 
   const filteredDocuments = documents.filter((doc) => {
     if (categoryFilter === 'all') return true
@@ -438,17 +497,87 @@ export const SubjectDetailPage: React.FC<SubjectDetailPageProps> = ({
 
       {/* TAB 2: TASKS */}
       {activeTab === 'tasks' && (
-        <div className="p-12 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 flex flex-col items-center justify-center text-center">
-          <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 mb-3">
-            <CheckCircle2 className="w-6 h-6" />
+        <div className="space-y-4">
+          {/* Tasks Toolbar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
+            {/* Status Filter Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+              {(
+                [
+                  { id: 'all', label: `All (${tasks.filter((t) => t.is_archived === 0).length})` },
+                  { id: 'todo', label: `To Do (${tasks.filter((t) => t.is_archived === 0 && t.status === 'todo').length})` },
+                  { id: 'in_progress', label: `In Progress (${tasks.filter((t) => t.is_archived === 0 && t.status === 'in_progress').length})` },
+                  { id: 'completed', label: `Completed (${tasks.filter((t) => t.is_archived === 0 && t.status === 'completed').length})` }
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setTaskStatusFilter(tab.id)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors shrink-0 ${
+                    taskStatusFilter === tab.id
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Create Task for this subject Button */}
+            <button
+              onClick={() => {
+                setEditingTask(null)
+                setIsTaskModalOpen(true)
+              }}
+              className="px-3.5 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-colors flex items-center gap-1.5 self-start sm:self-auto shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Course Task</span>
+            </button>
           </div>
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-            Subject Tasks ({subject.totalTasks})
-          </h3>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-sm">
-            Subject-scoped task creation, editing, and assignment attachment will be fully
-            integrated in Prompt 4. All tasks for this subject remain preserved in the SQLite vault.
-          </p>
+
+          {/* Tasks List */}
+          {filteredTasks.length === 0 ? (
+            <div className="p-12 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 flex flex-col items-center justify-center text-center">
+              <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 mb-3">
+                <CheckCircle2 className="w-6 h-6" />
+              </div>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                {taskStatusFilter === 'completed'
+                  ? 'No completed tasks yet'
+                  : 'No active tasks for this course'}
+              </h3>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-sm">
+                Add assignments, lab manuals, practicals, projects, or exam prep items for {subject.name}.
+              </p>
+              <button
+                onClick={() => {
+                  setEditingTask(null)
+                  setIsTaskModalOpen(true)
+                }}
+                className="mt-4 px-3.5 py-1.5 rounded-lg text-xs font-medium text-indigo-600 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 transition-colors"
+              >
+                Create First Task
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {filteredTasks.map((t) => (
+                <TaskCard
+                  key={t.id}
+                  task={t}
+                  onToggleStatus={handleToggleTaskStatus}
+                  onEdit={(item) => {
+                    setEditingTask(item)
+                    setIsTaskModalOpen(true)
+                  }}
+                  onArchive={(item) => setTaskToArchive(item)}
+                  onDelete={(item) => setTaskToDelete(item)}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -617,6 +746,49 @@ export const SubjectDetailPage: React.FC<SubjectDetailPageProps> = ({
         confirmText="Delete Document"
         onConfirm={handleDeleteDocument}
         onCancel={() => setDocToDelete(null)}
+      />
+
+      {/* Course Task Create / Edit Modal */}
+      <TaskModal
+        isOpen={isTaskModalOpen}
+        task={editingTask}
+        defaultSubjectId={subjectId}
+        onClose={() => {
+          setIsTaskModalOpen(false)
+          setEditingTask(null)
+        }}
+        onSaved={(t) => {
+          loadSubjectData()
+          setNotification({ type: 'success', message: `Task "${t.title}" saved.` })
+        }}
+      />
+
+      {/* Confirm Task Delete Modal */}
+      <ConfirmModal
+        isOpen={Boolean(taskToDelete)}
+        title="Delete Task"
+        message={`Are you sure you want to delete "${taskToDelete?.title}"?`}
+        warningNote="This academic task record will be permanently deleted from your SQLite vault."
+        confirmText="Delete Task"
+        isDestructive={true}
+        onConfirm={handleDeleteTaskConfirm}
+        onCancel={() => setTaskToDelete(null)}
+      />
+
+      {/* Confirm Task Archive Modal */}
+      <ConfirmModal
+        isOpen={Boolean(taskToArchive)}
+        title={taskToArchive?.is_archived === 1 ? 'Restore Task' : 'Archive Task'}
+        message={
+          taskToArchive?.is_archived === 1
+            ? `Restore "${taskToArchive?.title}" to active coursework?`
+            : `Archive "${taskToArchive?.title}"?`
+        }
+        warningNote="Archived tasks are preserved in your database, but excluded from completion metrics."
+        confirmText={taskToArchive?.is_archived === 1 ? 'Restore' : 'Archive'}
+        isDestructive={false}
+        onConfirm={handleArchiveTaskConfirm}
+        onCancel={() => setTaskToArchive(null)}
       />
     </div>
   )

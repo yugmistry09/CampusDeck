@@ -2,10 +2,12 @@ import Database from 'better-sqlite3'
 import { v4 as uuidv4 } from 'uuid'
 import type {
   TaskRow,
+  TaskWithSubject,
   TaskType,
   TaskStatus,
   TaskPriority,
-  CompletionResult
+  CompletionResult,
+  DashboardStats
 } from '../schema'
 
 // ---------------------------------------------------------------------------
@@ -40,6 +42,7 @@ export interface TaskListOptions {
   includeArchived?: boolean
   status?: TaskStatus
   priority?: TaskPriority
+  type?: TaskType
 }
 
 export function createTaskRepo(db: Database.Database) {
@@ -87,6 +90,41 @@ export function createTaskRepo(db: Database.Database) {
     ORDER BY due_date ASC
   `)
 
+  // Due soon query — tasks due within next N days (non-completed, non-archived, enriched with subject)
+  const stmtDueSoon = db.prepare<[number]>(`
+    SELECT t.*, s.name AS subject_name, s.color AS subject_color
+    FROM tasks t
+    LEFT JOIN subjects s ON t.subject_id = s.id
+    WHERE t.is_archived = 0
+      AND t.status != 'completed'
+      AND t.due_date IS NOT NULL
+      AND t.due_date >= DATE('now', 'localtime')
+      AND t.due_date <= DATE('now', '+' || ? || ' days', 'localtime')
+    ORDER BY t.due_date ASC,
+      CASE t.priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END
+  `)
+
+  // Dashboard aggregate stats — single round-trip for all metrics
+  const stmtDashboardStats = db.prepare<[]>(`
+    SELECT
+      COUNT(*) AS total,
+      COUNT(CASE WHEN status = 'completed' THEN 1 END) AS completed_count,
+      COUNT(CASE WHEN status IN ('todo', 'in_progress') THEN 1 END) AS open_count,
+      COUNT(CASE WHEN
+        status != 'completed'
+        AND due_date IS NOT NULL
+        AND due_date < DATE('now', 'localtime')
+      THEN 1 END) AS overdue_count,
+      COUNT(CASE WHEN
+        status != 'completed'
+        AND due_date IS NOT NULL
+        AND due_date >= DATE('now', 'localtime')
+        AND due_date <= DATE('now', '+7 days', 'localtime')
+      THEN 1 END) AS due_soon_count
+    FROM tasks
+    WHERE is_archived = 0
+  `)
+
   return {
     create(input: TaskCreateInput): TaskRow {
       return db.transaction(() => {
@@ -114,44 +152,62 @@ export function createTaskRepo(db: Database.Database) {
       return (stmtSelectById.get(id) as TaskRow | undefined) ?? null
     },
 
-    list(opts: TaskListOptions = {}): TaskRow[] {
+    getByIdWithSubject(id: string): TaskWithSubject | null {
+      const row = db
+        .prepare(
+          `SELECT t.*, s.name AS subject_name, s.color AS subject_color
+           FROM tasks t LEFT JOIN subjects s ON t.subject_id = s.id
+           WHERE t.id = ?`
+        )
+        .get(id) as TaskWithSubject | undefined
+      return row ?? null
+    },
+
+    list(opts: TaskListOptions = {}): TaskWithSubject[] {
       const conditions: string[] = []
       const params: (string | number)[] = []
 
       if (!opts.includeArchived) {
-        conditions.push('is_archived = 0')
+        conditions.push('t.is_archived = 0')
       }
       if (opts.subjectId !== undefined) {
         if (opts.subjectId === null) {
-          conditions.push('subject_id IS NULL')
+          conditions.push('t.subject_id IS NULL')
         } else {
-          conditions.push('subject_id = ?')
+          conditions.push('t.subject_id = ?')
           params.push(opts.subjectId)
         }
       }
       if (opts.status) {
-        conditions.push('status = ?')
+        conditions.push('t.status = ?')
         params.push(opts.status)
       }
       if (opts.priority) {
-        conditions.push('priority = ?')
+        conditions.push('t.priority = ?')
         params.push(opts.priority)
+      }
+      if (opts.type) {
+        conditions.push('t.type = ?')
+        params.push(opts.type)
       }
 
       const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
       const sql = `
-        SELECT * FROM tasks ${where}
+        SELECT t.*, s.name AS subject_name, s.color AS subject_color
+        FROM tasks t
+        LEFT JOIN subjects s ON t.subject_id = s.id
+        ${where}
         ORDER BY
-          CASE WHEN due_date IS NULL THEN 1 ELSE 0 END,
-          due_date ASC,
-          CASE priority
+          CASE WHEN t.due_date IS NULL THEN 1 ELSE 0 END,
+          t.due_date ASC,
+          CASE t.priority
             WHEN 'high'   THEN 0
             WHEN 'medium' THEN 1
             WHEN 'low'    THEN 2
           END,
-          created_at DESC
+          t.created_at DESC
       `
-      return db.prepare(sql).all(...params) as TaskRow[]
+      return db.prepare(sql).all(...params) as TaskWithSubject[]
     },
 
     update(input: TaskUpdateInput): TaskRow | null {
@@ -237,6 +293,30 @@ export function createTaskRepo(db: Database.Database) {
 
     getOverdue(): TaskRow[] {
       return stmtOverdue.all() as TaskRow[]
+    },
+
+    getUpcomingDueSoon(days: number = 7): TaskWithSubject[] {
+      return stmtDueSoon.all(days) as TaskWithSubject[]
+    },
+
+    getDashboardStats(): DashboardStats {
+      const row = stmtDashboardStats.get() as {
+        total: number
+        completed_count: number
+        open_count: number
+        overdue_count: number
+        due_soon_count: number
+      }
+      const total = row.total ?? 0
+      const completed = row.completed_count ?? 0
+      return {
+        total,
+        completed,
+        open: row.open_count ?? 0,
+        overdue: row.overdue_count ?? 0,
+        dueSoon: row.due_soon_count ?? 0,
+        percent: total === 0 ? 0 : Math.round((completed / total) * 100)
+      }
     }
   }
 }

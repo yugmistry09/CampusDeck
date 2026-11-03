@@ -90,14 +90,19 @@ export const taskArchiveSchema = z.object({
 })
 
 export const taskListSchema = z.object({
-  subjectId: uuidSchema.optional(),
+  subjectId: uuidSchema.nullable().optional(),
   includeArchived: z.boolean().optional(),
   status: taskStatusSchema.optional(),
-  priority: taskPrioritySchema.optional()
+  priority: taskPrioritySchema.optional(),
+  type: taskTypeSchema.optional()
 })
 
 export const taskCompletionSchema = z.object({
   subjectId: uuidSchema.optional()
+})
+
+export const taskDueSoonSchema = z.object({
+  days: z.number().int().min(1).max(365).optional()
 })
 
 // ---- Subject Document schemas ----------------------------------------------

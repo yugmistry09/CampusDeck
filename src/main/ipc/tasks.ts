@@ -7,14 +7,16 @@ import {
   taskArchiveSchema,
   taskListSchema,
   taskCompletionSchema,
+  taskDueSoonSchema,
   subjectIdSchema
 } from './validation'
 import type { TaskRepo } from '../db/repositories/tasks'
 
 // ---------------------------------------------------------------------------
 // Task IPC handlers
-// Channels: task:list, task:get, task:create, task:update,
-//           task:archive, task:delete, task:completion, task:overdue
+// Channels: task:list, task:get, task:get-with-subject, task:create,
+//           task:update, task:archive, task:delete, task:completion,
+//           task:overdue, task:due-soon, task:dashboard-stats
 // ---------------------------------------------------------------------------
 
 export function registerTaskHandlers(repo: TaskRepo): void {
@@ -25,7 +27,8 @@ export function registerTaskHandlers(repo: TaskRepo): void {
       subjectId: opts.subjectId,
       includeArchived: opts.includeArchived,
       status: opts.status,
-      priority: opts.priority
+      priority: opts.priority,
+      type: opts.type
     })
   })
 
@@ -33,6 +36,12 @@ export function registerTaskHandlers(repo: TaskRepo): void {
     assertTrustedSender(event.sender)
     const { id } = parseOrThrow(subjectIdSchema, payload)
     return repo.getById(id)
+  })
+
+  ipcMain.handle('task:get-with-subject', (event, payload: unknown) => {
+    assertTrustedSender(event.sender)
+    const { id } = parseOrThrow(subjectIdSchema, payload)
+    return repo.getByIdWithSubject(id)
   })
 
   ipcMain.handle('task:create', (event, payload: unknown) => {
@@ -68,5 +77,16 @@ export function registerTaskHandlers(repo: TaskRepo): void {
   ipcMain.handle('task:overdue', (event) => {
     assertTrustedSender(event.sender)
     return repo.getOverdue()
+  })
+
+  ipcMain.handle('task:due-soon', (event, payload: unknown) => {
+    assertTrustedSender(event.sender)
+    const opts = parseOrThrow(taskDueSoonSchema, payload ?? {})
+    return repo.getUpcomingDueSoon(opts.days ?? 7)
+  })
+
+  ipcMain.handle('task:dashboard-stats', (event) => {
+    assertTrustedSender(event.sender)
+    return repo.getDashboardStats()
   })
 }

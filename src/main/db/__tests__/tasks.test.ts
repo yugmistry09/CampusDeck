@@ -215,4 +215,80 @@ describe('Task Repository', () => {
     expect(overdue).toHaveLength(1)
     expect(overdue[0]?.title).toBe('Yesterday Task')
   })
+
+  it('filters tasks by type', () => {
+    taskRepo.create({ type: 'lab_manual', title: 'Lab 1' })
+    taskRepo.create({ type: 'lab_manual', title: 'Lab 2' })
+    taskRepo.create({ type: 'assignment', title: 'HW 1' })
+
+    const labTasks = taskRepo.list({ type: 'lab_manual' })
+    expect(labTasks).toHaveLength(2)
+    expect(labTasks.every((t) => t.type === 'lab_manual')).toBe(true)
+
+    const hwTasks = taskRepo.list({ type: 'assignment' })
+    expect(hwTasks).toHaveLength(1)
+    expect(hwTasks[0]?.title).toBe('HW 1')
+  })
+
+  it('retrieves upcoming tasks due soon within N days', () => {
+    // Today
+    const today = new Date().toISOString().split('T')[0]
+    // 3 days from now
+    const d3 = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    // 10 days from now
+    const d10 = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+
+    taskRepo.create({ type: 'assignment', title: 'Due Today', due_date: today })
+    taskRepo.create({ type: 'assignment', title: 'Due in 3 days', due_date: d3 })
+    taskRepo.create({ type: 'assignment', title: 'Due in 10 days', due_date: d10 })
+    taskRepo.create({ type: 'assignment', title: 'Completed Soon', due_date: d3, status: 'completed' })
+
+    const soon7 = taskRepo.getUpcomingDueSoon(7)
+    // Should include Today and in 3 days, but NOT completed and NOT in 10 days
+    expect(soon7.map((t) => t.title)).toContain('Due Today')
+    expect(soon7.map((t) => t.title)).toContain('Due in 3 days')
+    expect(soon7.map((t) => t.title)).not.toContain('Due in 10 days')
+    expect(soon7.map((t) => t.title)).not.toContain('Completed Soon')
+  })
+
+  it('computes complete dashboard aggregate stats accurately', () => {
+    const d2 = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+
+    // 1 overdue
+    taskRepo.create({ type: 'assignment', title: 'Past', due_date: '2000-01-01', status: 'todo' })
+    // 1 open due soon
+    taskRepo.create({ type: 'project', title: 'Soon', due_date: d2, status: 'in_progress' })
+    // 1 completed
+    taskRepo.create({ type: 'general', title: 'Done', status: 'completed' })
+    // 1 archived (should be excluded from all dashboard metrics)
+    const arch = taskRepo.create({ type: 'general', title: 'Old' })
+    taskRepo.setArchived(arch.id, true)
+
+    const stats = taskRepo.getDashboardStats()
+    expect(stats.total).toBe(3)
+    expect(stats.completed).toBe(1)
+    expect(stats.open).toBe(2)
+    expect(stats.overdue).toBe(1)
+    expect(stats.dueSoon).toBe(1)
+    expect(stats.percent).toBe(33) // 1 / 3 = 33%
+  })
+
+  it('joins subject information in list and getByIdWithSubject', () => {
+    const subjectRepo = createSubjectRepo(db)
+    const sub = subjectRepo.create({ name: 'Algorithms', code: 'CS301', color: '#10B981' })
+
+    const task = taskRepo.create({
+      subject_id: sub.id,
+      type: 'assignment',
+      title: 'Dynamic Programming'
+    })
+
+    const withSub = taskRepo.getByIdWithSubject(task.id)
+    expect(withSub?.subject_name).toBe('Algorithms')
+    expect(withSub?.subject_color).toBe('#10B981')
+
+    const listWithSub = taskRepo.list({ subjectId: sub.id })
+    expect(listWithSub).toHaveLength(1)
+    expect(listWithSub[0]?.subject_name).toBe('Algorithms')
+  })
 })
