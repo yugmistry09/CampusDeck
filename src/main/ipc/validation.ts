@@ -19,26 +19,30 @@ const dateSchema = z
   .nullable()
   .optional()
 
+// Hex color pattern (#RRGGBB or #RGB)
+const hexColorSchema = z
+  .string()
+  .regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, 'color must be a valid hex code like #4F46E5')
+  .nullable()
+  .optional()
+
 // ---- Subject schemas -------------------------------------------------------
 
 export const subjectCreateSchema = z.object({
-  name: z.string().min(1, 'name is required').max(200),
-  code: z.string().max(20).optional(),
-  color: z
-    .string()
-    .regex(/^#[0-9a-fA-F]{6}$/, 'color must be a hex colour like #4F46E5')
-    .optional()
+  name: z.string().trim().min(1, 'name is required').max(200),
+  code: z.string().trim().max(20).nullable().optional(),
+  color: hexColorSchema,
+  semester: z.string().trim().max(50).nullable().optional(),
+  notes: z.string().max(50000).optional()
 })
 
 export const subjectUpdateSchema = z.object({
   id: uuidSchema,
-  name: z.string().min(1).max(200).optional(),
-  code: z.string().max(20).nullable().optional(),
-  color: z
-    .string()
-    .regex(/^#[0-9a-fA-F]{6}$/)
-    .nullable()
-    .optional()
+  name: z.string().trim().min(1).max(200).optional(),
+  code: z.string().trim().max(20).nullable().optional(),
+  color: hexColorSchema,
+  semester: z.string().trim().max(50).nullable().optional(),
+  notes: z.string().max(50000).optional()
 })
 
 export const subjectIdSchema = z.object({ id: uuidSchema })
@@ -46,12 +50,12 @@ export const subjectIdSchema = z.object({ id: uuidSchema })
 // ---- Task schemas ----------------------------------------------------------
 
 export const taskTypeSchema = z.enum([
+  'general',
   'assignment',
   'lab_manual',
   'practical',
   'project',
   'exam_prep',
-  'general',
   'other'
 ])
 
@@ -62,7 +66,7 @@ export const taskPrioritySchema = z.enum(['low', 'medium', 'high'])
 export const taskCreateSchema = z.object({
   subject_id: uuidSchema.nullable().optional(),
   type: taskTypeSchema,
-  title: z.string().min(1, 'title is required').max(500),
+  title: z.string().trim().min(1, 'title is required').max(500),
   description: z.string().max(10000).optional(),
   due_date: dateSchema,
   priority: taskPrioritySchema.optional(),
@@ -73,7 +77,7 @@ export const taskUpdateSchema = z.object({
   id: uuidSchema,
   subject_id: uuidSchema.nullable().optional(),
   type: taskTypeSchema.optional(),
-  title: z.string().min(1).max(500).optional(),
+  title: z.string().trim().min(1).max(500).optional(),
   description: z.string().max(10000).optional(),
   due_date: dateSchema,
   priority: taskPrioritySchema.optional(),
@@ -100,20 +104,41 @@ export const taskCompletionSchema = z.object({
 
 export const subjectDocTypeSchema = z.enum([
   'syllabus',
+  'marks',
   'marks_scheme',
   'notice',
+  'reference',
   'timetable',
+  'notes',
   'other'
 ])
 
 export const subjectDocCreateSchema = z.object({
   subject_id: uuidSchema,
+  document_id: uuidSchema.nullable().optional(),
   type: subjectDocTypeSchema,
-  title: z.string().min(1).max(500),
+  title: z.string().trim().min(1, 'title is required').max(500),
+  description: z.string().max(10000).optional()
+})
+
+export const subjectDocUpdateSchema = z.object({
+  id: uuidSchema,
+  document_id: uuidSchema.nullable().optional(),
+  type: subjectDocTypeSchema.optional(),
+  title: z.string().trim().min(1).max(500).optional(),
   description: z.string().max(10000).optional()
 })
 
 export const subjectDocListSchema = z.object({ subjectId: uuidSchema })
+
+export const importSubjectDocSchema = z.object({
+  subjectId: uuidSchema,
+  title: z.string().trim().min(1).max(500),
+  type: subjectDocTypeSchema,
+  description: z.string().max(10000).optional()
+})
+
+export const documentIdSchema = z.object({ documentId: uuidSchema })
 
 // ---- Settings schemas ------------------------------------------------------
 
@@ -130,7 +155,6 @@ export const settingsUpdateSchema = z.object({
 // ---------------------------------------------------------------------------
 
 export function assertTrustedSender(senderContents: WebContents): void {
-  // Get all BrowserWindows that the main process owns
   const ownedWindows = BrowserWindow.getAllWindows()
   const isOwned = ownedWindows.some((w) => w.webContents === senderContents)
 

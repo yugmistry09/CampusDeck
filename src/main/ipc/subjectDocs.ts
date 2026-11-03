@@ -10,8 +10,7 @@ import type { SubjectDocRepo } from '../db/repositories/subjectDocs'
 
 // ---------------------------------------------------------------------------
 // Subject Document IPC handlers
-// Channels: subject-doc:list, subject-doc:create, subject-doc:delete
-// (subject-doc:update is intentionally deferred — not needed for Prompt 2)
+// Channels: subject-doc:list, subject-doc:list-all, subject-doc:create, subject-doc:delete
 // ---------------------------------------------------------------------------
 
 export function registerSubjectDocHandlers(repo: SubjectDocRepo): void {
@@ -19,6 +18,11 @@ export function registerSubjectDocHandlers(repo: SubjectDocRepo): void {
     assertTrustedSender(event.sender)
     const { subjectId } = parseOrThrow(subjectDocListSchema, payload)
     return repo.listBySubject(subjectId)
+  })
+
+  ipcMain.handle('subject-doc:list-all', (event) => {
+    assertTrustedSender(event.sender)
+    return repo.listAll()
   })
 
   ipcMain.handle('subject-doc:create', (event, payload: unknown) => {

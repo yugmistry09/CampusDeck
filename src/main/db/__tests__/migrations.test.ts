@@ -16,15 +16,16 @@ describe('Database Migrations', () => {
     db.close()
   })
 
-  it('runs initial migration and creates all required tables and views', () => {
+  it('runs all versioned migrations and creates all required tables and views', () => {
     runMigrationsFromDir(db, migrationsDir)
 
-    // Verify schema_migrations table exists and has 001_initial
+    // Verify schema_migrations table exists and has 001_initial and 002_subject_fields_and_categories
     const migrations = db
       .prepare('SELECT version FROM schema_migrations')
       .all() as { version: string }[]
-    expect(migrations.length).toBeGreaterThan(0)
+    expect(migrations.length).toBe(2)
     expect(migrations.some((m) => m.version === '001_initial')).toBe(true)
+    expect(migrations.some((m) => m.version === '002_subject_fields_and_categories')).toBe(true)
 
     // Verify all 6 required core tables exist
     const tables = (
@@ -86,7 +87,7 @@ describe('Database Migrations', () => {
         count: number
       }
     ).count
-    expect(count).toBe(1)
+    expect(count).toBe(2)
   })
 
   it('seeds default settings on initial run', () => {

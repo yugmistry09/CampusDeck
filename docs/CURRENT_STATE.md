@@ -22,15 +22,17 @@
 | Database Engine | ✅ Complete | SQLite via `better-sqlite3` in WAL mode, `foreign_keys = ON`, `synchronous = NORMAL` |
 | Migrations | ✅ Complete | Explicit, versioned, ordered migration runner with `schema_migrations` tracking (`001_initial.sql`) |
 | Relational Schema | ✅ Complete | `subjects`, `tasks`, `documents`, `task_documents`, `subject_documents`, `settings` (key-value) |
-| Task Model | ✅ Complete | Single source of truth; 7 types (`general`, `assignment`, `lab_manual`, `practical`, `project`, `exam_prep`, `other`), 3 statuses (`todo`, `in_progress`, `completed`), 3 priorities (`low`, `medium`, `high`), `due_date` as `YYYY-MM-DD`, `archived_at` timestamp |
-| File Storage Service | ✅ Complete | `fileLibrary.ts` service copies into managed library, preserves originals, assigns UUID prefixes, stores relative paths |
-| Repositories | ✅ Complete | Transactional repositories with parameterized queries and Zod schema validation |
-| Shell UI Views | ✅ Complete | Sidebar navigation, Header with theme toggle, and routable placeholder pages for Dashboard, Tasks, Subjects, All Files, and Settings |
-| Automated Tests | ✅ Complete | Vitest unit and repository test suite (5 test suites, 28 tests passing) |
+| Subject Management | ✅ Complete | Full CRUD with validation, code, semester, color picker, notes, stats, and delete confirmation |
+| Subject Drill-down View | ✅ Complete | Detail view with Overview, Files tab with category filtering, and Tasks tab placeholder |
+| Document Import Flow | ✅ Complete | Native main-process dialog, format & metadata validation, UUID-safe storage, transactional linking |
+| Document Opening | ✅ Complete | Secure `shell.openPath` via verified document ID only (never raw path from renderer) |
+| Non-Task Files Library | ✅ Complete | Subject Files tab and global All Files page with category tags, search, and delete |
+| Deletion Safeguards | ✅ Complete | Subject deletion sets `tasks.subject_id = NULL` (preserves tasks per D-006) and safely cleans unreferenced files |
+| Automated Tests | ✅ Complete | Vitest unit and service test suite (7 test suites, 39 tests passing) |
 
 ---
 
-## Exact Test Results (Prompt 2 Verification)
+## Exact Test Results (Prompt 3 Verification)
 
 Command run:
 ```bash
@@ -39,124 +41,109 @@ npm test
 
 Vitest output:
 ```
- ✓ src/main/db/__tests__/subjects.test.ts (6 tests)
  ✓ src/main/db/__tests__/tasks.test.ts (8 tests)
  ✓ src/main/db/__tests__/documents.test.ts (6 tests)
+ ✓ src/main/db/__tests__/subjects.test.ts (7 tests)
+ ✓ src/main/db/__tests__/subjectDocs.test.ts (4 tests)
  ✓ src/main/db/__tests__/migrations.test.ts (4 tests)
+ ✓ src/main/services/__tests__/fileLibrary.test.ts (6 tests)
  ✓ src/main/db/__tests__/settings.test.ts (4 tests)
 
- Test Files  5 passed (5)
-      Tests  28 passed (28)
+ Test Files  7 passed (7)
+      Tests  39 passed (39)
+   Duration  3.25s
 ```
 
 Exact test breakdown:
 1. `migrations.test.ts` (4 tests):
-   - Initial migration runs and creates all 6 core tables (`schema_migrations`, `subjects`, `tasks`, `documents`, `task_documents`, `subject_documents`, `settings`) and 2 compatibility views (`task_files`, `subject_document_files`).
-   - Indexes verified on subjects, tasks, documents, task_documents, and subject_documents.
-   - Idempotency verified: re-running migrations does not fail and applies nothing new.
-   - Default settings seeded: `theme: system`, `backup_schedule: daily`, `backup_retain: 30`.
-2. `subjects.test.ts` (6 tests):
-   - Subject creation and retrieval with UUID primary keys.
-   - Non-empty name constraint check.
-   - Case-insensitive ordered listing (`COLLATE NOCASE`).
-   - Updating name, code, and color.
-   - Foreign key behavior: deleting a subject sets `tasks.subject_id = NULL` (D-006 ON DELETE SET NULL).
-   - Foreign key behavior: deleting a subject cascade-deletes `subject_documents`.
+   - Migrations 001 and 002 run sequentially, creating all tables and views.
+   - Indexes and constraints verified.
+   - Idempotency verified: re-running migrations does not fail.
+   - Default settings seeded.
+2. `subjects.test.ts` (7 tests):
+   - Subject creation, retrieval, listing, and updates (including code, semester, color, notes).
+   - Validation checks on non-empty name.
+   - Foreign key behavior: deleting a subject sets `tasks.subject_id = NULL` (preserving tasks per D-006).
+   - Foreign key behavior: deleting a subject cascades to `subject_documents` and cleans unreferenced files.
 3. `tasks.test.ts` (8 tests):
-   - Tasks creation across all 7 types (`general`, `assignment`, `lab_manual`, `practical`, `project`, `exam_prep`, `other`).
-   - Constraint check rejecting invalid task types.
-   - Status transitions (`todo` -> `in_progress` -> `completed`) and priority assignments (`low`, `medium`, `high`).
-   - Due date validation enforcing `YYYY-MM-DD` or NULL.
-   - Task archiving sets `is_archived = 1` and `archived_at` timestamp; excludes archived from default active list.
-   - Completion formula calculation (`completed / total`, 0% when total is 0, never NaN).
-   - Subject-scoped completion calculations.
-   - Local date-evaluated overdue detection (`due_date < DATE('now', 'localtime')`).
+   - Creation across all 7 types (`general`, `assignment`, `lab_manual`, `practical`, `project`, `exam_prep`, `other`).
+   - Priority and status transitions.
+   - Due date validation (`YYYY-MM-DD` or NULL).
+   - Task archiving and isolation from active lists.
+   - Completion calculations and local date-evaluated overdue queries.
 4. `documents.test.ts` (6 tests):
-   - Document creation with UUID and relative paths.
-   - UNIQUE constraint enforcement on `relative_path`.
-   - Linking documents to tasks via `task_documents` with role (`assignment` / `solution`) and optional `variant_label`.
-   - Cascade deletion: deleting task removes `task_documents` while preserving document records.
-   - `task_files` compatibility view returns combined fields.
-   - Linking `subject_documents` to `documents` table.
-5. `settings.test.ts` (4 tests):
-   - Key-value get, set, and getAll.
-   - Arbitrary key-value updates.
-   - Structured `AppSettings` retrieval.
-   - Partial preference updates.
+   - Document creation and unique path constraints.
+   - Task document links and cascade behaviors.
+   - View compatibility (`task_files`).
+5. `subjectDocs.test.ts` (4 tests):
+   - Document attachment with categories (`syllabus`, `marks`, `notice`, `reference`, `timetable`, `notes`, `other`).
+   - Listing by subject and global listing across all subjects.
+   - Unreferenced document cleanup upon deletion.
+6. `fileLibrary.test.ts` (6 tests):
+   - Supported academic formats validation (PDF, images, DOCX, PPTX, XLSX, TXT, MD, CSV).
+   - Unsupported file rejection (EXE, script, binary).
+   - Accurate MIME type resolution.
+   - Preserving original files upon import and assigning UUID-prefixed relative paths.
+   - Transactional import and document link creation.
+   - Safe document opening error handling for non-existent document IDs.
+7. `settings.test.ts` (4 tests):
+   - Key-value get, set, getAll, and partial preferences upserts.
 
 Typecheck verification:
 ```bash
 npm run typecheck
 ```
-Result: Clean exit (code 0) across both Node (`tsconfig.json`) and Web (`tsconfig.web.json`) compilers.
+Result: Clean exit (code 0) across `tsconfig.json` and `tsconfig.web.json`.
 
 Build verification:
 ```bash
 npm run build
 ```
-Result: Clean production bundle created in `out/main/index.js`, `out/preload/index.js`, and `out/renderer/` assets.
+Result: Clean production bundle created for main process (`out/main/index.js`), preload bridge (`out/preload/index.js`), and renderer assets (`out/renderer/`).
 
 ---
 
-## Files Created & Modified in This Stage
+## Files Created & Modified in Prompt 3
 
-### Database & Main Process
-- `src/main/db/migrations/001_initial.sql`: Versioned SQLite migration defining all 6 tables and 2 views.
-- `src/main/db/connection.ts`: Database connection singleton, WAL mode, foreign key enforcement, migration runner.
-- `src/main/db/schema.ts`: Row types and database enums.
-- `src/main/db/repositories/subjects.ts`: Subject repository.
-- `src/main/db/repositories/tasks.ts`: Task repository with completion and overdue queries.
-- `src/main/db/repositories/documents.ts`: Document and task_documents repository.
-- `src/main/db/repositories/subjectDocs.ts`: Subject document repository.
-- `src/main/db/repositories/settings.ts`: Key-value settings repository.
-- `src/main/services/fileLibrary.ts`: File management service.
-- `src/main/utils/paths.ts`: Path resolution under dedicated `<userData>/campusdesk_storage/`.
-- `src/main/ipc/validation.ts`: Zod schemas and `assertTrustedSender` security check.
-- `src/main/ipc/subjects.ts`, `tasks.ts`, `settings.ts`, `subjectDocs.ts`, `index.ts`: IPC handlers.
-- `src/main/index.ts`: Electron application lifecycle, CSP session interceptor, BrowserWindow security configuration.
-- `src/preload/index.ts`: Typed IPC bridge exposing `window.campusDeskAPI`.
-- `src/shared/types.ts`: Shared domain and contract types across processes.
+### Database & Shared Contracts
+- `src/main/db/migrations/002_subject_fields_and_categories.sql`: Migration adding `semester`, `notes` to `subjects` and updating `subject_documents` type constraints and view.
+- `src/shared/types.ts`: Centralized TypeScript contracts for subjects, tasks, documents, subject docs, settings, and IPC communication.
+- `src/main/db/repositories/subjects.ts`: Updated repository methods supporting `semester`, `notes`, `listWithStats`, `getByIdWithStats`, and safe transactional deletion with document cleanup.
+- `src/main/db/repositories/subjectDocs.ts`: Enriched queries with full document and subject metadata joins, `listAll()`, and document cleanup.
+- `src/main/services/fileLibrary.ts`: File import service with native dialog support, file type whitelist, traversal guards, and secure ID-based application launch.
 
-### Tests
-- `src/main/db/__tests__/migrations.test.ts`
-- `src/main/db/__tests__/subjects.test.ts`
-- `src/main/db/__tests__/tasks.test.ts`
-- `src/main/db/__tests__/documents.test.ts`
-- `src/main/db/__tests__/settings.test.ts`
-- `vitest.config.ts`: Vitest Node-environment configuration.
+### IPC & Preload
+- `src/main/ipc/validation.ts`: Zod schemas for subject mutation, document imports, and document ID validation.
+- `src/main/ipc/subjects.ts`: IPC handlers for subject CRUD and stats queries.
+- `src/main/ipc/subjectDocs.ts`: IPC handlers for subject document listing, addition, and removal.
+- `src/main/ipc/files.ts`: Native dialog trigger and document opening handlers.
+- `src/preload/index.ts`: Exposing typed API methods (`subjects.*`, `subjectDocs.*`, `files.*`) on `window.campusDeskAPI`.
 
-### Renderer & UI Shell
-- `src/renderer/src/App.tsx`: Main application shell with theme state and navigation.
-- `src/renderer/src/components/Sidebar.tsx`: Sidebar navigation with academic aesthetic and icons.
-- `src/renderer/src/components/Header.tsx`: Page header and Light/Dark/System theme switcher.
-- `src/renderer/src/routes/DashboardPage.tsx`: Dashboard overview with metric cards.
-- `src/renderer/src/routes/TasksPage.tsx`: Unified to-do list placeholder with filter bar.
-- `src/renderer/src/routes/SubjectsPage.tsx`: Subject cards overview placeholder.
-- `src/renderer/src/routes/AllFilesPage.tsx`: Local file library view placeholder.
-- `src/renderer/src/routes/SettingsPage.tsx`: Settings view showing persistent data directories and backup settings.
-- `src/renderer/src/main.tsx` & `src/renderer/src/index.css`: React entry and Tailwind CSS layer.
-
-### Documentation & Configuration
-- `README.md`: Development instructions, prerequisites, and architecture overview.
-- `docs/DATA_MODEL.md`: Updated with full v0.2 normalized schema documentation.
-- `docs/CURRENT_STATE.md`: Updated with exact test results and stage milestone.
-- `package.json` & `package-lock.json`: Dependencies pinned and lockfile committed.
+### Renderer & UI Layer
+- `src/renderer/src/components/ConfirmModal.tsx`: Accessible modal for destructive action confirmations.
+- `src/renderer/src/components/SubjectModal.tsx`: Subject create/edit modal with color picker, semester, code, and notes.
+- `src/renderer/src/components/DocumentUploadModal.tsx`: Native upload trigger modal with category tags, title, and description.
+- `src/renderer/src/routes/SubjectDetailPage.tsx`: Subject detail view with Overview, Files tab, and Tasks tab placeholder.
+- `src/renderer/src/routes/SubjectsPage.tsx`: Grid/list of subjects with search, metrics, and create/edit/delete actions.
+- `src/renderer/src/routes/AllFilesPage.tsx`: Global non-task files view with category filter pills, subject filter, and quick open actions.
+- `src/renderer/src/routes/DashboardPage.tsx`: Wired to real subject count and quick action navigation.
 
 ---
 
-## Next Stage: Prompt 3
+## Next Stage: Prompt 4
 
-**Goal**: Implement Task CRUD and Subject drill-down feature UI.
+**Goal**: Implement complete Task CRUD, unified to-do list, task attachments, and dashboard metrics.
 
 **Pre-conditions**:
-- SQLite persistence layer complete and verified (28 tests passing).
-- Preload API typed and operational.
-- Shell UI routable.
+- Subject CRUD, drill-down, and non-task document storage fully operational and tested.
+- File library service and path resolution verified.
+- 39 automated unit and service tests passing.
 
-**Tasks for Prompt 3**:
-1. Implement Task Creation & Edit modal with form validation (type, subject, title, description, due date, priority).
-2. Wire Task listing, status toggling (`todo` -> `in_progress` -> `completed`), and archiving actions directly to the SQLite IPC backend.
-3. Build Subject drill-down view showing subject-specific tasks and non-task documents (syllabuses, notices).
-4. Implement Task deletion confirmation ensuring physical file cleanup via `fileLibrary.ts`.
-5. Update Dashboard metrics dynamically when tasks change.
-6. Run integration tests and update `CURRENT_STATE.md`.
+**Tasks for Prompt 4**:
+1. Implement Task Create/Edit modal with validation (type, title, description, priority, subject selection, due date).
+2. Wire Tasks tab inside Subject Detail view to filter tasks specifically for that subject.
+3. Build the unified Tasks page with status toggle (`todo`, `in_progress`, `completed`), priority badges, due date display with overdue warnings, and filter bar (by status, priority, subject, type).
+4. Implement Task attachments for assignments and solutions via `task_documents` and `fileLibrary.ts`.
+5. Implement Task deletion confirmation with physical file cleanup.
+6. Connect Dashboard metrics (active tasks, overdue count, completion rate) dynamically to the database.
+7. Run tests, verify build, and update `CURRENT_STATE.md`.

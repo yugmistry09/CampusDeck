@@ -32,7 +32,9 @@ CREATE TABLE subjects (
     id         TEXT PRIMARY KEY CHECK(length(id) = 36),  -- UUID v4
     name       TEXT NOT NULL CHECK(trim(name) != ''),
     code       TEXT,                                     -- "CS201" (optional)
+    semester   TEXT,                                     -- "Spring 2026" (optional)
     color      TEXT,                                     -- Hex color "#4F46E5" (optional)
+    notes      TEXT NOT NULL DEFAULT '',                 -- Subject overview notes / syllabus description
     created_at TEXT NOT NULL,                            -- ISO 8601
     updated_at TEXT NOT NULL
 );
@@ -41,7 +43,8 @@ CREATE INDEX idx_subjects_name ON subjects(name COLLATE NOCASE);
 ```
 
 **Delete behavior**: Deleting a subject sets `tasks.subject_id = NULL` for all its tasks
-(`ON DELETE SET NULL`, D-006). All `subject_documents` for the subject are cascade-deleted.
+(`ON DELETE SET NULL`, D-006). All `subject_documents` for the subject are cascade-deleted,
+and any unreferenced physical documents are safely removed from the library root.
 
 ---
 
@@ -137,7 +140,8 @@ CREATE TABLE subject_documents (
     subject_id  TEXT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
     document_id TEXT REFERENCES documents(id) ON DELETE CASCADE,
     type        TEXT NOT NULL CHECK(type IN (
-                    'syllabus', 'marks_scheme', 'notice', 'timetable', 'other'
+                    'syllabus', 'marks', 'marks_scheme', 'notice',
+                    'reference', 'timetable', 'notes', 'other'
                 )),
     title       TEXT NOT NULL CHECK(trim(title) != ''),
     description TEXT NOT NULL DEFAULT '',

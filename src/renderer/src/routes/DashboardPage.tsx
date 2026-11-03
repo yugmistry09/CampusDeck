@@ -8,12 +8,19 @@ export const DashboardPage: React.FC = () => {
     completed: 0,
     percent: 0
   })
+  const [subjectCount, setSubjectCount] = useState<number>(0)
 
   useEffect(() => {
     if (window.campusDeskAPI?.tasks?.completion) {
       window.campusDeskAPI.tasks
         .completion()
         .then(setCompletion)
+        .catch(console.error)
+    }
+    if (window.campusDeskAPI?.subjects?.list) {
+      window.campusDeskAPI.subjects
+        .list()
+        .then((subs) => setSubjectCount(subs.length))
         .catch(console.error)
     }
   }, [])
@@ -70,7 +77,7 @@ export const DashboardPage: React.FC = () => {
           </div>
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-              0
+              {subjectCount}
             </span>
             <span className="text-xs text-slate-500 dark:text-slate-400">registered subjects</span>
           </div>

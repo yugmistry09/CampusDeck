@@ -19,7 +19,16 @@ export function getAppPaths(): {
   libraryRoot: string
   backupsRoot: string
 } {
-  const userData = app.getPath('userData')
+  let userData: string
+  try {
+    if (typeof app === 'object' && app !== null && typeof app.getPath === 'function') {
+      userData = app.getPath('userData')
+    } else {
+      userData = join(process.cwd(), 'scratch', 'test_userdata')
+    }
+  } catch {
+    userData = join(process.cwd(), 'scratch', 'test_userdata')
+  }
   const appDataDir = join(userData, 'campusdesk_storage')
   return {
     userData,

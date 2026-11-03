@@ -1,10 +1,17 @@
 import { ipcMain } from 'electron'
-import { assertTrustedSender, parseOrThrow, subjectCreateSchema, subjectUpdateSchema, subjectIdSchema } from './validation'
+import {
+  assertTrustedSender,
+  parseOrThrow,
+  subjectCreateSchema,
+  subjectUpdateSchema,
+  subjectIdSchema
+} from './validation'
 import type { SubjectRepo } from '../db/repositories/subjects'
 
 // ---------------------------------------------------------------------------
 // Subject IPC handlers
-// Channels: subject:list, subject:get, subject:create, subject:update, subject:delete
+// Channels: subject:list, subject:list-with-stats, subject:get,
+//           subject:get-with-stats, subject:create, subject:update, subject:delete
 // ---------------------------------------------------------------------------
 
 export function registerSubjectHandlers(repo: SubjectRepo): void {
@@ -13,10 +20,21 @@ export function registerSubjectHandlers(repo: SubjectRepo): void {
     return repo.list()
   })
 
+  ipcMain.handle('subject:list-with-stats', (event) => {
+    assertTrustedSender(event.sender)
+    return repo.listWithStats()
+  })
+
   ipcMain.handle('subject:get', (event, payload: unknown) => {
     assertTrustedSender(event.sender)
     const { id } = parseOrThrow(subjectIdSchema, payload)
     return repo.getById(id)
+  })
+
+  ipcMain.handle('subject:get-with-stats', (event, payload: unknown) => {
+    assertTrustedSender(event.sender)
+    const { id } = parseOrThrow(subjectIdSchema, payload)
+    return repo.getByIdWithStats(id)
   })
 
   ipcMain.handle('subject:create', (event, payload: unknown) => {
