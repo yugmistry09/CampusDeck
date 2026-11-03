@@ -1,0 +1,22 @@
+appId: com.campusdesk.app
+productName: CampusDeck
+copyright: CampusDeck contributors
+
+directories:
+  buildResources: resources
+  output: dist
+
+files:
+  - out/**/*
+
+extraResources:
+  - from: resources/icons
+    to: icons
+
+linux:
+  target:
+    - deb
+    - AppImage
+  category: Education
+
+asar: true
