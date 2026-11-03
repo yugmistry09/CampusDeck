@@ -70,6 +70,22 @@ export interface TaskRow {
   updated_at: string
 }
 
+/** TaskRow enriched with joined subject metadata for display purposes. */
+export interface TaskWithSubject extends TaskRow {
+  subject_name: string | null
+  subject_color: string | null
+}
+
+/** Aggregate statistics for the dashboard, computed in a single IPC call. */
+export interface DashboardStats {
+  open: number      // non-archived, status = todo | in_progress
+  dueSoon: number   // non-archived, non-completed, due_date within next 7 days
+  overdue: number   // non-archived, non-completed, due_date < today
+  completed: number // non-archived, status = completed
+  total: number     // all non-archived
+  percent: number   // D-008 completion percent
+}
+
 export interface DocumentRow {
   id: string
   display_name: string
@@ -207,6 +223,7 @@ export interface TaskListOptions {
   includeArchived?: boolean
   status?: TaskStatus
   priority?: TaskPriority
+  type?: TaskType
 }
 
 export interface SubjectDocumentCreateInput {

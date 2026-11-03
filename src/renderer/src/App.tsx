@@ -65,7 +65,12 @@ export const App: React.FC = () => {
         />
 
         <main className="flex-1 overflow-y-auto p-6">
-          {currentTab === 'dashboard' && <DashboardPage />}
+          {currentTab === 'dashboard' && (
+            <DashboardPage
+              onNavigateToTasks={() => setCurrentTab('tasks')}
+              onNavigateToSubjects={() => setCurrentTab('subjects')}
+            />
+          )}
           {currentTab === 'tasks' && <TasksPage />}
           {currentTab === 'subjects' && <SubjectsPage />}
           {currentTab === 'files' && <AllFilesPage />}

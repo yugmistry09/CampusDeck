@@ -3,6 +3,8 @@ import type {
   SubjectRow,
   SubjectWithStats,
   TaskRow,
+  TaskWithSubject,
+  DashboardStats,
   SubjectDocumentRow,
   SubjectDocumentRecord,
   AppSettings,
@@ -46,8 +48,9 @@ const api = {
   },
 
   tasks: {
-    list: (opts?: TaskListOptions) => invoke<TaskRow[]>('task:list', opts ?? {}),
+    list: (opts?: TaskListOptions) => invoke<TaskWithSubject[]>('task:list', opts ?? {}),
     get: (id: string) => invoke<TaskRow | null>('task:get', { id }),
+    getWithSubject: (id: string) => invoke<TaskWithSubject | null>('task:get-with-subject', { id }),
     create: (input: TaskCreateInput) => invoke<TaskRow>('task:create', input),
     update: (input: TaskUpdateInput) => invoke<TaskRow | null>('task:update', input),
     archive: (id: string, archived: boolean) =>
@@ -55,7 +58,9 @@ const api = {
     delete: (id: string) => invoke<void>('task:delete', { id }),
     completion: (subjectId?: string) =>
       invoke<CompletionResult>('task:completion', subjectId ? { subjectId } : {}),
-    overdue: () => invoke<TaskRow[]>('task:overdue')
+    overdue: () => invoke<TaskRow[]>('task:overdue'),
+    dueSoon: (days?: number) => invoke<TaskWithSubject[]>('task:due-soon', { days }),
+    dashboardStats: () => invoke<DashboardStats>('task:dashboard-stats')
   },
 
   subjectDocs: {
