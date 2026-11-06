@@ -117,7 +117,7 @@ CREATE TABLE task_documents (
     id            TEXT PRIMARY KEY CHECK(length(id) = 36),  -- UUID v4
     task_id       TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
     document_id   TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-    role          TEXT NOT NULL CHECK(role IN ('assignment', 'solution')),
+    role          TEXT NOT NULL CHECK(role IN ('assignment_file', 'solution', 'reference', 'other', 'assignment')),
     variant_label TEXT,
     created_at    TEXT NOT NULL
 );

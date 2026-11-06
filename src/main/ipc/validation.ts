@@ -145,6 +145,38 @@ export const importSubjectDocSchema = z.object({
 
 export const documentIdSchema = z.object({ documentId: uuidSchema })
 
+// ---- Task Document schemas -------------------------------------------------
+
+export const taskDocumentRoleSchema = z.enum([
+  'assignment_file',
+  'solution',
+  'reference',
+  'other',
+  'assignment'
+])
+
+export const taskDocIdSchema = z.object({ id: uuidSchema })
+export const taskIdParamSchema = z.object({ taskId: uuidSchema })
+export const subjectIdParamSchema = z.object({ subjectId: uuidSchema })
+
+export const taskDocUpdateSchema = z.object({
+  id: uuidSchema,
+  role: taskDocumentRoleSchema.optional(),
+  variant_label: z.string().trim().max(100).nullable().optional(),
+  display_name: z.string().trim().min(1, 'Display name cannot be empty').max(255).optional()
+})
+
+export const importTaskDocSchema = z.object({
+  taskId: uuidSchema,
+  role: taskDocumentRoleSchema,
+  variantLabel: z.string().trim().max(100).nullable().optional(),
+  customDisplayName: z.string().trim().max(255).optional()
+})
+
+export const documentRefCountSchema = z.object({
+  documentId: uuidSchema
+})
+
 // ---- Settings schemas ------------------------------------------------------
 
 export const settingsUpdateSchema = z.object({

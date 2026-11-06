@@ -33,3 +33,6 @@ coverage/
 
 # TypeScript incremental
 *.tsbuildinfo
+
+# Scratch test directories
+scratch/
