@@ -8,12 +8,14 @@ import {
   Edit3,
   Archive,
   ArchiveRestore,
-  Trash2
+  Trash2,
+  Paperclip
 } from 'lucide-react'
-import type { TaskWithSubject, TaskType, TaskPriority } from '@shared/types'
+import type { TaskWithSubject, TaskType, TaskPriority, TaskDocumentRecord } from '@shared/types'
 
 interface TaskCardProps {
   task: TaskWithSubject
+  attachments?: TaskDocumentRecord[]
   onSelect?: (task: TaskWithSubject) => void
   onToggleStatus: (task: TaskWithSubject) => void
   onEdit: (task: TaskWithSubject) => void
@@ -76,6 +78,7 @@ function formatDate(dateStr: string): string {
 
 export const TaskCard: React.FC<TaskCardProps> = ({
   task,
+  attachments,
   onSelect,
   onToggleStatus,
   onEdit,
@@ -194,6 +197,38 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
               {task.description}
             </p>
+          )}
+
+          {/* Attachments preview */}
+          {attachments && attachments.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap mt-2">
+              {attachments.map((att) => {
+                const isSolution = att.role === 'solution'
+                const isAssignment = att.role === 'assignment_file' || att.role === 'assignment'
+                return (
+                  <span
+                    key={att.id}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onSelect?.(task)
+                    }}
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border cursor-pointer hover:opacity-80 transition-opacity ${
+                      isSolution
+                        ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                        : isAssignment
+                        ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
+                        : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                    }`}
+                    title={`${att.display_name} (${att.role}${att.variant_label ? `: ${att.variant_label}` : ''})`}
+                  >
+                    <Paperclip className="w-2.5 h-2.5 shrink-0" />
+                    <span className="truncate max-w-[120px]">
+                      {isSolution && att.variant_label ? att.variant_label : att.display_name}
+                    </span>
+                  </span>
+                )
+              })}
+            </div>
           )}
         </div>
       </div>

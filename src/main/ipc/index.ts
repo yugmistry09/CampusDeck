@@ -4,11 +4,13 @@ import { createTaskRepo } from '../db/repositories/tasks'
 import { createSettingsRepo } from '../db/repositories/settings'
 import { createSubjectDocRepo } from '../db/repositories/subjectDocs'
 import { createDocumentRepo } from '../db/repositories/documents'
+import { createTaskDocRepo } from '../db/repositories/taskDocs'
 import { createFileLibraryService } from '../services/fileLibrary'
 import { registerSubjectHandlers } from './subjects'
 import { registerTaskHandlers } from './tasks'
 import { registerSettingsHandlers } from './settings'
 import { registerSubjectDocHandlers } from './subjectDocs'
+import { registerTaskDocHandlers } from './taskDocs'
 import { registerFileHandlers } from './files'
 
 // ---------------------------------------------------------------------------
@@ -22,11 +24,13 @@ export function registerAllIpcHandlers(db: Database): void {
   const settingsRepo = createSettingsRepo(db)
   const subjectDocRepo = createSubjectDocRepo(db)
   const documentRepo = createDocumentRepo(db)
-  const fileLibrary = createFileLibraryService(documentRepo, subjectDocRepo)
+  const taskDocRepo = createTaskDocRepo(db)
+  const fileLibrary = createFileLibraryService(documentRepo, subjectDocRepo, taskDocRepo)
 
   registerSubjectHandlers(subjectRepo)
   registerTaskHandlers(taskRepo)
   registerSettingsHandlers(settingsRepo)
   registerSubjectDocHandlers(subjectDocRepo)
+  registerTaskDocHandlers(taskDocRepo, fileLibrary)
   registerFileHandlers(fileLibrary)
 }

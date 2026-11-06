@@ -15,7 +15,12 @@ import type {
   TaskUpdateInput,
   TaskListOptions,
   SubjectDocumentCreateInput,
-  ImportSubjectDocInput
+  ImportSubjectDocInput,
+  TaskDocumentRecord,
+  TaskDocumentUpdateInput,
+  TaskDocumentDeleteResult,
+  ImportTaskDocInput,
+  DocumentRefCount
 } from '../shared/types'
 
 // ---------------------------------------------------------------------------
@@ -61,6 +66,28 @@ const api = {
     overdue: () => invoke<TaskRow[]>('task:overdue'),
     dueSoon: (days?: number) => invoke<TaskWithSubject[]>('task:due-soon', { days }),
     dashboardStats: () => invoke<DashboardStats>('task:dashboard-stats')
+  },
+
+  taskDocs: {
+    list: (taskId: string) =>
+      invoke<TaskDocumentRecord[]>('task-doc:list', { taskId }),
+    listBySubject: (subjectId: string) =>
+      invoke<TaskDocumentRecord[]>('task-doc:list-by-subject', { subjectId }),
+    listAll: () =>
+      invoke<TaskDocumentRecord[]>('task-doc:list-all'),
+    selectAndImport: (input: ImportTaskDocInput) =>
+      invoke<{ canceled: boolean; documents?: TaskDocumentRecord[] }>(
+        'task-doc:select-and-import',
+        input
+      ),
+    update: (input: TaskDocumentUpdateInput) =>
+      invoke<TaskDocumentRecord | null>('task-doc:update', input),
+    unlink: (id: string) =>
+      invoke<{ success: boolean }>('task-doc:unlink', { id }),
+    delete: (id: string) =>
+      invoke<TaskDocumentDeleteResult>('task-doc:delete', { id }),
+    getRefCount: (documentId: string) =>
+      invoke<DocumentRefCount>('task-doc:ref-count', { documentId })
   },
 
   subjectDocs: {

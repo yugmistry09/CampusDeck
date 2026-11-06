@@ -4,7 +4,14 @@ import { dialog, shell, BrowserWindow } from 'electron'
 import { v4 as uuidv4 } from 'uuid'
 import type { DocumentRepo, DocumentCreateInput } from '../db/repositories/documents'
 import type { SubjectDocRepo } from '../db/repositories/subjectDocs'
-import type { DocumentRow, TaskDocumentRole, SubjectDocumentType, SubjectDocumentRecord } from '../../shared/types'
+import type { TaskDocRepo } from '../db/repositories/taskDocs'
+import type {
+  DocumentRow,
+  TaskDocumentRole,
+  TaskDocumentRecord,
+  SubjectDocumentType,
+  SubjectDocumentRecord
+} from '../../shared/types'
 import { getAppPaths } from '../utils/paths'
 
 // ---------------------------------------------------------------------------
@@ -67,7 +74,8 @@ export function sanitizeFilename(name: string): string {
 
 export function createFileLibraryService(
   documentRepo: DocumentRepo,
-  subjectDocRepo?: SubjectDocRepo
+  subjectDocRepo?: SubjectDocRepo,
+  taskDocRepo?: TaskDocRepo
 ) {
   const { libraryRoot } = getAppPaths()
 
@@ -90,21 +98,35 @@ export function createFileLibraryService(
     /**
      * Displays native open file dialog for user selection.
      */
-    async showNativeFileDialog(parentWindow?: BrowserWindow | null): Promise<{
+    async showNativeFileDialog(
+      parentWindow?: BrowserWindow | null,
+      options?: { allowMultiple?: boolean; title?: string }
+    ): Promise<{
       canceled: boolean
       filePath?: string
       fileName?: string
       fileSize?: number
       mimeType?: string
+      files?: Array<{
+        filePath: string
+        fileName: string
+        fileSize: number
+        mimeType: string
+      }>
     }> {
       const allowedExtensions = Object.keys(SUPPORTED_EXTENSIONS_MAP).map((ext) =>
         ext.replace('.', '')
       )
 
       const win = parentWindow || BrowserWindow.getFocusedWindow() || undefined
+      const properties: Array<'openFile' | 'multiSelections'> = ['openFile']
+      if (options?.allowMultiple) {
+        properties.push('multiSelections')
+      }
+
       const result = await dialog.showOpenDialog(win!, {
-        title: 'Select Academic Document',
-        properties: ['openFile'],
+        title: options?.title || 'Select Academic Document',
+        properties,
         filters: [
           {
             name: 'All Supported Academic Documents',
@@ -122,22 +144,30 @@ export function createFileLibraryService(
         return { canceled: true }
       }
 
-      const filePath = result.filePaths[0]!
-      const fileName = basename(filePath)
+      const selectedFiles = result.filePaths.map((filePath) => {
+        const fileName = basename(filePath)
+        if (!isSupportedFileType(fileName)) {
+          throw new Error(
+            `Unsupported file format "${extname(fileName)}" for file "${fileName}". Supported formats: PDF, Images, Word, PowerPoint, Excel, and Text.`
+          )
+        }
+        const stats = statSync(filePath)
+        return {
+          filePath,
+          fileName,
+          fileSize: stats.size,
+          mimeType: getMimeType(fileName)
+        }
+      })
 
-      if (!isSupportedFileType(fileName)) {
-        throw new Error(
-          `Unsupported file format "${extname(fileName)}". Supported formats: PDF, Images, Word, PowerPoint, Excel, and Text.`
-        )
-      }
-
-      const stats = statSync(filePath)
+      const primary = selectedFiles[0]!
       return {
         canceled: false,
-        filePath,
-        fileName,
-        fileSize: stats.size,
-        mimeType: getMimeType(fileName)
+        filePath: primary.filePath,
+        fileName: primary.fileName,
+        fileSize: primary.fileSize,
+        mimeType: primary.mimeType,
+        files: selectedFiles
       }
     },
 
@@ -265,13 +295,56 @@ export function createFileLibraryService(
       }
     ) {
       const doc = this.importFile(sourcePath, options)
+      if (taskDocRepo) {
+        const link = taskDocRepo.link({
+          taskId,
+          documentId: doc.id,
+          role,
+          variantLabel: options?.variantLabel ?? null
+        })
+        return { document: doc, taskDocument: link }
+      }
       const link = documentRepo.linkTaskDocument({
         task_id: taskId,
         document_id: doc.id,
-        role,
+        role: role as any,
         variant_label: options?.variantLabel ?? null
       })
       return { document: doc, taskDocument: link }
+    },
+
+    /**
+     * Atomically imports multiple files and attaches them to a task.
+     */
+    importMultipleTaskDocuments(
+      taskId: string,
+      fileList: Array<{ filePath: string; displayName?: string }>,
+      role: TaskDocumentRole,
+      options?: {
+        variantLabel?: string | null
+      }
+    ): TaskDocumentRecord[] {
+      if (!taskDocRepo) {
+        throw new Error('taskDocRepo not configured in FileLibraryService')
+      }
+
+      const created: TaskDocumentRecord[] = []
+      for (const item of fileList) {
+        const doc = this.importFile(item.filePath, { displayName: item.displayName })
+        try {
+          const record = taskDocRepo.link({
+            taskId,
+            documentId: doc.id,
+            role,
+            variantLabel: options?.variantLabel ?? null
+          })
+          created.push(record)
+        } catch (err) {
+          this.deleteDocument(doc.id)
+          throw err
+        }
+      }
+      return created
     },
 
     /**

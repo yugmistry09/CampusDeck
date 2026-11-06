@@ -10,7 +10,8 @@ import type {
   TaskWithSubject,
   TaskStatus,
   TaskPriority,
-  SubjectRow
+  SubjectRow,
+  TaskDocumentRecord
 } from '@shared/types'
 import { TaskCard } from '../components/TaskCard'
 import { TaskModal } from '../components/TaskModal'
@@ -40,6 +41,7 @@ function getLocalInNDays(days: number): string {
 export const TasksPage: React.FC = () => {
   const [tasks, setTasks] = useState<TaskWithSubject[]>([])
   const [subjects, setSubjects] = useState<SubjectRow[]>([])
+  const [taskAttachments, setTaskAttachments] = useState<Record<string, TaskDocumentRecord[]>>({})
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
 
   // Filters
@@ -58,15 +60,23 @@ export const TasksPage: React.FC = () => {
 
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
-  // Load all tasks and subjects
+  // Load all tasks, subjects, and attachments
   const loadData = useCallback(async () => {
     try {
-      const [allTasks, allSubjects] = await Promise.all([
+      const [allTasks, allSubjects, allAttachments] = await Promise.all([
         window.campusDeskAPI.tasks.list({ includeArchived: true }),
-        window.campusDeskAPI.subjects.list()
+        window.campusDeskAPI.subjects.list(),
+        window.campusDeskAPI.taskDocs.listAll()
       ])
       setTasks(allTasks)
       setSubjects(allSubjects)
+
+      const grouped: Record<string, TaskDocumentRecord[]> = {}
+      for (const a of allAttachments) {
+        if (!grouped[a.task_id]) grouped[a.task_id] = []
+        grouped[a.task_id]!.push(a)
+      }
+      setTaskAttachments(grouped)
     } catch (err) {
       console.error('Failed to load tasks data:', err)
       setNotification({
@@ -459,6 +469,7 @@ export const TasksPage: React.FC = () => {
             <TaskCard
               key={task.id}
               task={task}
+              attachments={taskAttachments[task.id]}
               onSelect={(t) => setSelectedTaskId(t.id)}
               onToggleStatus={handleToggleStatus}
               onEdit={(t) => {

@@ -16,7 +16,12 @@ export type TaskStatus = 'todo' | 'in_progress' | 'completed'
 
 export type TaskPriority = 'low' | 'medium' | 'high'
 
-export type TaskDocumentRole = 'assignment' | 'solution'
+export type TaskDocumentRole =
+  | 'assignment_file'
+  | 'solution'
+  | 'reference'
+  | 'other'
+  | 'assignment'
 export type TaskFileRole = TaskDocumentRole
 
 export type SubjectDocumentType =
@@ -103,6 +108,23 @@ export interface TaskDocumentRow {
   role: TaskDocumentRole
   variant_label: string | null
   created_at: string
+}
+
+export interface TaskDocumentRecord {
+  id: string
+  task_id: string
+  document_id: string
+  role: TaskDocumentRole
+  variant_label: string | null
+  created_at: string
+  // Attached document metadata
+  display_name: string
+  relative_path: string
+  mime_type: string
+  size_bytes: number | null
+  document_created_at?: string
+  // Physical storage integrity status
+  file_exists?: boolean
 }
 
 export interface SubjectDocumentRow {
@@ -248,3 +270,31 @@ export interface ImportSubjectDocInput {
   type: SubjectDocumentType
   description?: string
 }
+
+export interface TaskDocumentUpdateInput {
+  id: string
+  role?: TaskDocumentRole
+  variant_label?: string | null
+  display_name?: string
+}
+
+export interface TaskDocumentDeleteResult {
+  unlinked: boolean
+  fileDeleted: boolean
+  remainingRefs: number
+}
+
+export interface ImportTaskDocInput {
+  taskId: string
+  role: TaskDocumentRole
+  variantLabel?: string | null
+  customDisplayName?: string
+}
+
+export interface DocumentRefCount {
+  totalRefs: number
+  taskDocRefs: number
+  subjectDocRefs: number
+  isShared: boolean
+}
+

@@ -17,13 +17,15 @@ import type {
   SubjectDocumentRecord,
   SubjectDocumentType,
   TaskWithSubject,
-  TaskStatus
+  TaskStatus,
+  TaskDocumentRecord
 } from '@shared/types'
 import { SubjectModal } from '../components/SubjectModal'
 import { DocumentUploadModal } from '../components/DocumentUploadModal'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { TaskCard } from '../components/TaskCard'
 import { TaskModal } from '../components/TaskModal'
+import { TaskDetailPage } from './TaskDetailPage'
 
 interface SubjectDetailPageProps {
   subjectId: string
@@ -84,6 +86,8 @@ export const SubjectDetailPage: React.FC<SubjectDetailPageProps> = ({
   const [subject, setSubject] = useState<SubjectWithStats | null>(null)
   const [documents, setDocuments] = useState<SubjectDocumentRecord[]>([])
   const [tasks, setTasks] = useState<TaskWithSubject[]>([])
+  const [taskAttachments, setTaskAttachments] = useState<Record<string, TaskDocumentRecord[]>>({})
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<TabMode>('overview')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [taskStatusFilter, setTaskStatusFilter] = useState<'all' | 'todo' | 'in_progress' | 'completed'>('all')
@@ -102,14 +106,22 @@ export const SubjectDetailPage: React.FC<SubjectDetailPageProps> = ({
 
   const loadSubjectData = useCallback(async () => {
     try {
-      const stats = await window.campusDeskAPI.subjects.getWithStats(subjectId)
+      const [stats, docs, subTasks, attachments] = await Promise.all([
+        window.campusDeskAPI.subjects.getWithStats(subjectId),
+        window.campusDeskAPI.subjectDocs.list(subjectId),
+        window.campusDeskAPI.tasks.list({ subjectId, includeArchived: true }),
+        window.campusDeskAPI.taskDocs.listBySubject(subjectId)
+      ])
       if (stats) setSubject(stats)
-
-      const docs = await window.campusDeskAPI.subjectDocs.list(subjectId)
       setDocuments(docs)
-
-      const subTasks = await window.campusDeskAPI.tasks.list({ subjectId, includeArchived: true })
       setTasks(subTasks)
+
+      const grouped: Record<string, TaskDocumentRecord[]> = {}
+      for (const a of attachments) {
+        if (!grouped[a.task_id]) grouped[a.task_id] = []
+        grouped[a.task_id]!.push(a)
+      }
+      setTaskAttachments(grouped)
     } catch (err) {
       console.error('Failed to load subject details:', err)
       setNotification({
@@ -216,6 +228,20 @@ export const SubjectDetailPage: React.FC<SubjectDetailPageProps> = ({
     if (categoryFilter === 'all') return true
     return doc.type === categoryFilter
   })
+
+  if (selectedTaskId) {
+    return (
+      <TaskDetailPage
+        taskId={selectedTaskId}
+        onBack={() => setSelectedTaskId(null)}
+        onTaskDeleted={() => {
+          setSelectedTaskId(null)
+          loadSubjectData()
+        }}
+        onTaskUpdated={() => loadSubjectData()}
+      />
+    )
+  }
 
   if (!subject) {
     return (
@@ -567,6 +593,8 @@ export const SubjectDetailPage: React.FC<SubjectDetailPageProps> = ({
                 <TaskCard
                   key={t.id}
                   task={t}
+                  attachments={taskAttachments[t.id]}
+                  onSelect={(item) => setSelectedTaskId(item.id)}
                   onToggleStatus={handleToggleTaskStatus}
                   onEdit={(item) => {
                     setEditingTask(item)
