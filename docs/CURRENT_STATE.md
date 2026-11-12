@@ -36,17 +36,21 @@
 | File Integrity & Missing File Detection | ✅ Complete | Verification of file presence on disk; visual badge and graceful error handling for missing files |
 | In-App PDF Viewer | ✅ Complete | Built with `pdfjs-dist` and locally bundled Web Worker (zero CDN, 100% offline). Page navigation, jump-to-page, zoom controls, fit-to-width, canvas rendering with DPR scaling, and task attachment switching |
 | Secure PDF Access IPC | ✅ Complete | Main-process IPC `pdf:get-document-bytes` & `pdf:get-document-metadata` streaming vault bytes by document ID; strict validation, path traversal guard, and MIME verification |
+| Settings & Theme Switcher | ✅ Complete | Light, Dark, and System theme preferences with instant UI application and persistent storage in SQLite `settings` table |
+| Storage Usage & Data Folder | ✅ Complete | Real-time disk utilization metrics (database size, file vault size, total files, total storage) and native "Open Data Folder" action via `shell.openPath` |
+| Manual Backup Export (.zip) | ✅ Complete | Consistent SQLite snapshot via native `db.backup()`, managed files bundle, and `manifest.json` with SHA-256 checksums and schema version |
+| Safe Atomic Restore & Rollback | ✅ Complete | Staged extraction, path traversal rejection, checksum validation, database closure, rollback snapshots, atomic swap, and dynamic IPC proxy rebinding |
 | Non-PDF Default Application Action | ✅ Complete | Clearly labelled "Open with default app" action for non-PDF attachments and subject documents |
 | Subject Task Attachment Display | ✅ Complete | Attachment badges on task cards in subject task lists without duplicating task records |
 | Document Import Flow | ✅ Complete | Native main-process dialog (with multi-select support), format & metadata validation, UUID-safe storage, transactional linking |
 | Document Opening | ✅ Complete | Secure `shell.openPath` via verified document ID only (never raw path from renderer) |
 | Non-Task Files Library | ✅ Complete | Subject Files tab and global All Files page with category tags, search, and delete |
 | Deletion Safeguards | ✅ Complete | Subject deletion sets `tasks.subject_id = NULL` (preserves tasks per D-006) and safely cleans unreferenced files |
-| Automated Tests | ✅ Complete | Vitest unit and service test suite (9 test suites, 59 tests passing) |
+| Automated Tests | ✅ Complete | Vitest unit, service, and IPC test suites (10 test suites, 66 tests passing) |
 
 ---
 
-## Exact Test Results (Prompt 6 Verification)
+## Exact Test Results (Prompt 7 Verification)
 
 Command run:
 ```bash
@@ -57,33 +61,42 @@ npm run build
 
 Vitest output:
 ```
- ✓ src/main/ipc/__tests__/pdfAccess.test.ts (8 tests)
  ✓ src/main/db/__tests__/tasks.test.ts (12 tests)
- ✓ src/main/db/__tests__/taskDocs.test.ts (8 tests)
+ ✓ src/main/ipc/__tests__/pdfAccess.test.ts (8 tests)
  ✓ src/main/db/__tests__/documents.test.ts (6 tests)
  ✓ src/main/db/__tests__/subjects.test.ts (7 tests)
+ ✓ src/main/services/__tests__/fileLibrary.test.ts (6 tests)
  ✓ src/main/db/__tests__/subjectDocs.test.ts (4 tests)
  ✓ src/main/db/__tests__/migrations.test.ts (4 tests)
- ✓ src/main/services/__tests__/fileLibrary.test.ts (6 tests)
  ✓ src/main/db/__tests__/settings.test.ts (4 tests)
+ ✓ src/main/db/__tests__/taskDocs.test.ts (8 tests)
+ ✓ src/main/services/__tests__/backupRestore.test.ts (7 tests)
 
- Test Files  9 passed (9)
-      Tests  59 passed (59)
-   Duration  3.96s
+ Test Files  10 passed (10)
+      Tests  66 passed (66)
+   Duration  9.70s
 ```
 
 Production Build output:
 ```
-✓ built in 1.13s (main process)
-✓ built in 55ms (preload)
+✓ built in 6.54s (main process)
+✓ built in 65ms (preload)
 out/renderer/assets/pdf.worker.min-CIqJB0yW.mjs  1,271.92 kB
-out/renderer/assets/index-l7uJo-SG.css              52.32 kB
-out/renderer/assets/index-slqlbGY4.js            1,387.13 kB
-✓ built in 13.55s
+out/renderer/assets/index-Ccr76zb8.css              53.63 kB
+out/renderer/assets/index-CXq87Fdf.js            1,411.80 kB
+✓ built in 39.19s
 ```
 
 Exact test breakdown:
-0. `pdfAccess.test.ts` (8 tests):
+0. `backupRestore.test.ts` (7 tests):
+   - Performs complete round-trip backup and restore with SHA-256 file integrity verification.
+   - Strictly rejects corrupt or malformed archive files without affecting current app state.
+   - Strictly rejects archives missing `manifest.json` or `campusdesk.db`.
+   - Strictly rejects malicious archives containing path traversal (`../` or absolute) entries.
+   - Rejects archives with incompatible future schema versions.
+   - Detects missing files or checksum mismatches declared in manifest and initiates rollback.
+   - Calculates storage usage accurately across database, library files, and total counts.
+1. `pdfAccess.test.ts` (8 tests):
    - Retrieves valid PDF document bytes matching vault disk content.
    - Retrieves accurate PDF metadata for valid document ID.
    - Rejects non-existent document ID with not-found error.
@@ -92,7 +105,7 @@ Exact test breakdown:
    - Safely handles missing physical disk files with descriptive error.
    - Guards against path traversal in relative paths (`toAbsolutePath`).
    - Rejects untrusted sender `webContents` via `assertTrustedSender`.
-1. `taskDocs.test.ts` (8 tests):
+2. `taskDocs.test.ts` (8 tests):
    - Multiple assignment document attachments to a single task (`assignment_file`).
    - Multiple solution variants with distinct variant labels ("Variant A", "Variant B", "Teacher's solution").
    - Attachment role changes and variant label updates (e.g. from `reference` to `solution`).
@@ -212,17 +225,69 @@ Result: Clean production bundle created for main process (`out/main/index.js`), 
 
 ---
 
-## Next Stage: Prompt 7
+## Implementation Details for Prompt 7 (Settings, Storage Usage, Backup & Atomic Restore)
+
+### Dependencies
+- Added `adm-zip` and `@types/adm-zip` for in-memory and streaming ZIP archive extraction, manipulation, and creation without spawning external shell processes.
+
+### Main Process Services & IPC
+- `src/main/utils/paths.ts`:
+  - Updated `getAppPaths()` with `TEST_USER_DATA_DIR` support for completely isolated parallel test runner worker directories.
+- `src/main/services/backupService.ts`:
+  - `getStorageUsage()`: Reads database file size, iterates recursively over `libraryRoot` measuring total bytes and file counts safely, returning `StorageUsageInfo`.
+  - `exportBackup(targetZipPath)`:
+    - Creates a consistent SQLite database snapshot using SQLite's native online backup API (`await db.backup(tempDbPath)`), preventing corruption or copying half-written WAL files.
+    - Inspects current schema version from `schema_migrations` table.
+    - Scans all files in `library/`, computing SHA-256 integrity checksums for each file.
+    - Generates `manifest.json` containing `format_version: 1`, `schema_version`, `app_version`, `created_at`, `total_files`, and `files` array.
+    - Packages `manifest.json`, `campusdesk.db`, and all managed files into a user-selected ZIP archive.
+  - `restoreBackup(archivePath, onDatabaseReopened)`:
+    - Stage 1 — Validation: Inspects ZIP entries, rejects corrupt/malformed archives, strictly validates that no entries contain path traversal sequences (`../`, absolute paths, drive letters).
+    - Stage 2 — Manifest & Schema Check: Verifies presence of `manifest.json` and `campusdesk.db`, verifies manifest schema version against current database migrations.
+    - Stage 3 — Staged Extraction: Extracts into an isolated timestamped staging directory (`<appDataDir>/staging_restore_<timestamp>/`). Computes SHA-256 for all extracted files and verifies match against manifest.
+    - Stage 4 — Safe Atomic Swap & Rollback:
+      - Closes existing database connection (`closeDatabase()`).
+      - Moves existing `campusdesk.db` (plus WAL/SHM) and `library/` into a backup rollback directory (`<appDataDir>/pre_restore_rollback_<timestamp>/`).
+      - Moves staged database and library into place.
+      - If any step fails, automatically triggers rollback restoring the previous database and library.
+      - Reopens database via `openDatabase()` and invokes `onDatabaseReopened(newDb)`.
+      - Cleans up staging and rollback temporary directories upon success.
+- `src/main/ipc/index.ts`:
+  - Wrapped all repositories in ES6 dynamic Proxy delegates (`subjectRepoProxy`, `taskRepoProxy`, etc.) so that active IPC handlers immediately delegate to the newly restored and reopened SQLite connection without requiring manual handler re-registration.
+- `src/main/ipc/settings.ts`:
+  - Handlers for `settings:get-storage-usage`, `settings:open-data-folder` (via `shell.openPath`), `backup:export` (via native `dialog.showSaveDialog`), and `backup:restore` (via native `dialog.showOpenDialog`).
+
+### Shared Contracts & Preload
+- `src/shared/types.ts`:
+  - Added types: `StorageUsageInfo`, `BackupManifestFileEntry`, `BackupManifest`, `BackupExportResult`, `BackupRestoreResult`, `BackupValidationResult`.
+- `src/preload/index.ts`:
+  - Exposed `campusDeskAPI.settings.getStorageUsage()`, `campusDeskAPI.settings.openDataFolder()`, `campusDeskAPI.backup.export()`, and `campusDeskAPI.backup.restore()`.
+
+### Renderer Layer
+- `src/renderer/src/routes/SettingsPage.tsx`:
+  - Appearance section: Theme cards for Light, Dark, and System with immediate live styling toggle and database persistence.
+  - Application Information section: App version, data location paths (`Data Root`, `Database`, `File Vault`, `Backups Folder`), and "Open Data Folder" button.
+  - Storage Utilization section: Disk usage cards for Database size, File Library size, Total Files, and Total Managed Storage, with a manual refresh button.
+  - Backup & Disaster Recovery section:
+    - "Export Backup (.zip)" button with progress states and export summary banner.
+    - "Restore from Backup" flow with prominent Warning Confirmation Modal: alerts the user that restore replaces current application data, advises creating a backup first, requires explicit confirmation checkbox, and shows restore results.
+- `src/renderer/src/App.tsx`:
+  - Wired `currentTheme={theme}` and `onThemeChange={handleThemeChange}` to `SettingsPage`.
+
+---
+
+## Next Stage: Prompt 8
 
 **Goal**: Full-text / Metadata Search and Tagging / Filtering across all academic entities (Tasks, Subjects, Coursework Documents).
 
 **Pre-conditions**:
-- Prompt 6 complete: In-app offline PDF viewer implemented, tested, and bundled.
-- All 59 unit and integration tests passing.
-- Production build clean with bundled worker asset.
+- Prompt 7 complete: Settings, theme switcher, storage usage, backup export, and safe atomic restore implemented, tested, and bundled.
+- All 66 unit, service, and IPC tests passing.
+- Production build clean across main, preload, and renderer.
 
-**Tasks for Prompt 7**:
+**Tasks for Prompt 8**:
 1. Implement unified search service in the main process querying across tasks, subjects, and attached document metadata.
 2. Build UI search bar and live filtering across all views (Dashboard, Tasks, Subjects, All Files).
 3. Support tag filtering and multi-criteria queries.
 4. Add automated test coverage and update documentation.
+

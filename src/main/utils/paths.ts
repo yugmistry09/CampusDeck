@@ -21,13 +21,15 @@ export function getAppPaths(): {
 } {
   let userData: string
   try {
-    if (typeof app === 'object' && app !== null && typeof app.getPath === 'function') {
+    if (process.env.TEST_USER_DATA_DIR) {
+      userData = process.env.TEST_USER_DATA_DIR
+    } else if (typeof app === 'object' && app !== null && typeof app.getPath === 'function') {
       userData = app.getPath('userData')
     } else {
       userData = join(process.cwd(), 'scratch', 'test_userdata')
     }
   } catch {
-    userData = join(process.cwd(), 'scratch', 'test_userdata')
+    userData = process.env.TEST_USER_DATA_DIR || join(process.cwd(), 'scratch', 'test_userdata')
   }
   const appDataDir = join(userData, 'campusdesk_storage')
   return {

@@ -74,7 +74,9 @@ export const App: React.FC = () => {
           {currentTab === 'tasks' && <TasksPage />}
           {currentTab === 'subjects' && <SubjectsPage />}
           {currentTab === 'files' && <AllFilesPage />}
-          {currentTab === 'settings' && <SettingsPage />}
+          {currentTab === 'settings' && (
+            <SettingsPage currentTheme={theme} onThemeChange={handleThemeChange} />
+          )}
         </main>
       </div>
     </div>

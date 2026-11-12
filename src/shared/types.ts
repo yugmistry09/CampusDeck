@@ -306,3 +306,48 @@ export interface PdfDocumentMetadata {
   created_at: string
 }
 
+export interface StorageUsageInfo {
+  dbSizeBytes: number
+  librarySizeBytes: number
+  totalSizeBytes: number
+  fileCount: number
+}
+
+export interface BackupManifestFileEntry {
+  relative_path: string
+  display_name?: string
+  size_bytes: number
+  sha256: string
+}
+
+export interface BackupManifest {
+  version: number
+  app_version: string
+  created_at: string
+  schema_version: number
+  database_file: string
+  files: BackupManifestFileEntry[]
+}
+
+export interface BackupExportResult {
+  canceled: boolean
+  backupPath?: string
+  totalFiles?: number
+  totalSizeBytes?: number
+}
+
+export interface BackupRestoreResult {
+  canceled: boolean
+  success?: boolean
+  restoredFiles?: number
+  schemaVersion?: number
+  error?: string
+}
+
+export interface BackupValidationResult {
+  valid: boolean
+  manifest?: BackupManifest
+  error?: string
+}
+
+

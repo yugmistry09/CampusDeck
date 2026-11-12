@@ -21,7 +21,10 @@ import type {
   TaskDocumentDeleteResult,
   ImportTaskDocInput,
   DocumentRefCount,
-  PdfDocumentMetadata
+  PdfDocumentMetadata,
+  StorageUsageInfo,
+  BackupExportResult,
+  BackupRestoreResult
 } from '../shared/types'
 
 // ---------------------------------------------------------------------------
@@ -124,7 +127,14 @@ const api = {
     getPaths: () =>
       invoke<{ userData: string; appDataDir: string; library: string; backups: string; version: string }>(
         'settings:get-paths'
-      )
+      ),
+    getStorageUsage: () => invoke<StorageUsageInfo>('settings:get-storage-usage'),
+    openDataFolder: () => invoke<{ success: boolean }>('settings:open-data-folder')
+  },
+
+  backup: {
+    export: () => invoke<BackupExportResult>('backup:export'),
+    restore: () => invoke<BackupRestoreResult>('backup:restore')
   }
 } as const
 
