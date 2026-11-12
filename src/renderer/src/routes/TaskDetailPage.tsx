@@ -13,6 +13,7 @@ import {
   Paperclip,
   Plus,
   ExternalLink,
+  Eye,
   Unlink,
   FileQuestion,
   Tag
@@ -28,6 +29,7 @@ import { TaskModal } from '../components/TaskModal'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { TaskAttachmentModal } from '../components/TaskAttachmentModal'
 import { TaskAttachmentEditModal } from '../components/TaskAttachmentEditModal'
+import { PdfViewer, type PdfViewerAttachmentItem } from '../components/PdfViewer'
 
 interface TaskDetailPageProps {
   taskId: string
@@ -123,6 +125,7 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
   const [attachmentToUnlink, setAttachmentToUnlink] = useState<TaskDocumentRecord | null>(null)
   const [attachmentToDelete, setAttachmentToDelete] = useState<TaskDocumentRecord | null>(null)
   const [deleteRefInfo, setDeleteRefInfo] = useState<DocumentRefCount | null>(null)
+  const [activePdfDoc, setActivePdfDoc] = useState<PdfViewerAttachmentItem | null>(null)
 
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
@@ -228,14 +231,34 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
     }
   }
 
+  // Open document in app (for PDF) or default app (for others)
+  const handleOpenDocument = (doc: TaskDocumentRecord) => {
+    const isPdf =
+      doc.display_name.toLowerCase().endsWith('.pdf') ||
+      doc.role === 'assignment_file' ||
+      doc.role === 'solution'
+
+    if (isPdf) {
+      setActivePdfDoc({
+        id: doc.id,
+        document_id: doc.document_id,
+        display_name: doc.display_name,
+        role: doc.role,
+        variant_label: doc.variant_label
+      })
+    } else {
+      handleOpenInDefaultApp(doc)
+    }
+  }
+
   // Open file in OS default application
-  const handleOpenDocument = async (doc: TaskDocumentRecord) => {
+  const handleOpenInDefaultApp = async (doc: TaskDocumentRecord) => {
     try {
       await window.campusDeskAPI.files.openDocument(doc.document_id)
     } catch (err) {
       setNotification({
         type: 'error',
-        message: err instanceof Error ? err.message : 'Could not open file.'
+        message: err instanceof Error ? err.message : 'Could not open file in default application.'
       })
     }
   }
@@ -326,6 +349,35 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
     }
     return { all: attachments.length, assignments, solutions, references }
   }, [attachments])
+
+  if (activePdfDoc && task) {
+    const allPdfAttachments: PdfViewerAttachmentItem[] = attachments
+      .filter(
+        (a) =>
+          a.display_name.toLowerCase().endsWith('.pdf') ||
+          a.role === 'assignment_file' ||
+          a.role === 'solution'
+      )
+      .map((a) => ({
+        id: a.id,
+        document_id: a.document_id,
+        display_name: a.display_name,
+        role: a.role,
+        variant_label: a.variant_label
+      }))
+
+    return (
+      <div className="max-w-5xl mx-auto">
+        <PdfViewer
+          document={activePdfDoc}
+          taskAttachments={allPdfAttachments}
+          taskTitle={task.title}
+          onClose={() => setActivePdfDoc(null)}
+          onSelectDocument={(doc) => setActivePdfDoc(doc)}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6 max-w-4xl animate-fade-in">
@@ -718,13 +770,34 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
 
                   {/* Actions */}
                   <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      onClick={() => handleOpenDocument(doc)}
-                      title="Open file in default app"
-                      className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </button>
+                    {ext === 'PDF' || doc.role === 'assignment_file' || doc.role === 'solution' ? (
+                      <>
+                        <button
+                          onClick={() => handleOpenDocument(doc)}
+                          title="View PDF in app"
+                          className="px-2 py-1 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 transition-colors flex items-center gap-1 text-xs font-medium border border-indigo-200 dark:border-indigo-800/80"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">View</span>
+                        </button>
+                        <button
+                          onClick={() => handleOpenInDefaultApp(doc)}
+                          title="Open with default application"
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => handleOpenInDefaultApp(doc)}
+                        title="Open with default application"
+                        className="px-2 py-1 rounded-lg text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5 text-xs font-medium border border-slate-200 dark:border-slate-700"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>Open with default app</span>
+                      </button>
+                    )}
                     <button
                       onClick={() => setEditingAttachment(doc)}
                       title="Edit attachment details"

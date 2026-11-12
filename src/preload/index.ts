@@ -20,7 +20,8 @@ import type {
   TaskDocumentUpdateInput,
   TaskDocumentDeleteResult,
   ImportTaskDocInput,
-  DocumentRefCount
+  DocumentRefCount,
+  PdfDocumentMetadata
 } from '../shared/types'
 
 // ---------------------------------------------------------------------------
@@ -108,6 +109,13 @@ const api = {
       ),
     openDocument: (documentId: string) =>
       invoke<{ success: boolean }>('file:open-document', { documentId })
+  },
+
+  pdf: {
+    getBytes: (documentId: string) =>
+      invoke<Uint8Array>('pdf:get-document-bytes', { documentId }),
+    getMetadata: (documentId: string) =>
+      invoke<PdfDocumentMetadata>('pdf:get-document-metadata', { documentId })
   },
 
   settings: {

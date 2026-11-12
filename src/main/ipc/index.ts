@@ -12,6 +12,7 @@ import { registerSettingsHandlers } from './settings'
 import { registerSubjectDocHandlers } from './subjectDocs'
 import { registerTaskDocHandlers } from './taskDocs'
 import { registerFileHandlers } from './files'
+import { registerPdfHandlers } from './pdf'
 
 // ---------------------------------------------------------------------------
 // IPC handler registration entry point
@@ -33,4 +34,5 @@ export function registerAllIpcHandlers(db: Database): void {
   registerSubjectDocHandlers(subjectDocRepo)
   registerTaskDocHandlers(taskDocRepo, fileLibrary)
   registerFileHandlers(fileLibrary)
+  registerPdfHandlers(documentRepo, fileLibrary)
 }

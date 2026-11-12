@@ -5,7 +5,7 @@
 
 ---
 
-## Snapshot Date: 2026-11-06
+## Snapshot Date: 2026-11-12
 
 ---
 
@@ -16,8 +16,8 @@
 | Repository & Environment | ✅ Complete | Node v22.23.4 (via fnm), npm v10.9.9, Git repository initialized on `main` branch |
 | Desktop Runtime | ✅ Complete | Electron v33.2.0, electron-vite v2.3.0, TypeScript v5.6.3 (strict mode) |
 | UI Framework & Styling | ✅ Complete | React 18, Tailwind CSS 3.4 (dark mode `class` strategy), Lucide Icons, responsive shell |
-| Security Boundary | ✅ Complete | `nodeIntegration: false`, `contextIsolation: true`, `sandbox: true`, restrictive CSP, `assertTrustedSender` window verification |
-| Preload API | ✅ Complete | Narrow, typed `contextBridge` exposing `window.campusDeskAPI` (no raw `ipcRenderer` or SQL exposed) |
+| Security Boundary | ✅ Complete | `nodeIntegration: false`, `contextIsolation: true`, `sandbox: true`, restrictive CSP with `worker-src 'self' blob:` and `connect-src 'none'`, `assertTrustedSender` window verification |
+| Preload API | ✅ Complete | Narrow, typed `contextBridge` exposing `window.campusDeskAPI` (including `pdf.getBytes` and `pdf.getMetadata`) |
 | Storage Location | ✅ Complete | Dedicated directory beneath `userData`: `<userData>/campusdesk_storage/` (db, library, backups) |
 | Database Engine | ✅ Complete | SQLite via `better-sqlite3` in WAL mode, `foreign_keys = ON`, `synchronous = NORMAL` |
 | Migrations | ✅ Complete | 3 versioned migrations (`001_initial.sql`, `002_subject_fields_and_categories.sql`, `003_task_attachment_roles.sql`) with `schema_migrations` tracking |
@@ -34,24 +34,30 @@
 | Unlinking & Vault Deletion | ✅ Complete | Safe unlinking from task (leaving vault file intact) and deletion with reference count verification |
 | Shared Document Protection | ✅ Complete | Referential integrity safeguard: shared files linked to multiple tasks or subjects are NEVER deleted from disk when unlinked |
 | File Integrity & Missing File Detection | ✅ Complete | Verification of file presence on disk; visual badge and graceful error handling for missing files |
+| In-App PDF Viewer | ✅ Complete | Built with `pdfjs-dist` and locally bundled Web Worker (zero CDN, 100% offline). Page navigation, jump-to-page, zoom controls, fit-to-width, canvas rendering with DPR scaling, and task attachment switching |
+| Secure PDF Access IPC | ✅ Complete | Main-process IPC `pdf:get-document-bytes` & `pdf:get-document-metadata` streaming vault bytes by document ID; strict validation, path traversal guard, and MIME verification |
+| Non-PDF Default Application Action | ✅ Complete | Clearly labelled "Open with default app" action for non-PDF attachments and subject documents |
 | Subject Task Attachment Display | ✅ Complete | Attachment badges on task cards in subject task lists without duplicating task records |
 | Document Import Flow | ✅ Complete | Native main-process dialog (with multi-select support), format & metadata validation, UUID-safe storage, transactional linking |
 | Document Opening | ✅ Complete | Secure `shell.openPath` via verified document ID only (never raw path from renderer) |
 | Non-Task Files Library | ✅ Complete | Subject Files tab and global All Files page with category tags, search, and delete |
 | Deletion Safeguards | ✅ Complete | Subject deletion sets `tasks.subject_id = NULL` (preserves tasks per D-006) and safely cleans unreferenced files |
-| Automated Tests | ✅ Complete | Vitest unit and service test suite (8 test suites, 51 tests passing) |
+| Automated Tests | ✅ Complete | Vitest unit and service test suite (9 test suites, 59 tests passing) |
 
 ---
 
-## Exact Test Results (Prompt 5 Verification)
+## Exact Test Results (Prompt 6 Verification)
 
 Command run:
 ```bash
 npm test
+npm run typecheck
+npm run build
 ```
 
 Vitest output:
 ```
+ ✓ src/main/ipc/__tests__/pdfAccess.test.ts (8 tests)
  ✓ src/main/db/__tests__/tasks.test.ts (12 tests)
  ✓ src/main/db/__tests__/taskDocs.test.ts (8 tests)
  ✓ src/main/db/__tests__/documents.test.ts (6 tests)
@@ -61,12 +67,31 @@ Vitest output:
  ✓ src/main/services/__tests__/fileLibrary.test.ts (6 tests)
  ✓ src/main/db/__tests__/settings.test.ts (4 tests)
 
- Test Files  8 passed (8)
-      Tests  51 passed (51)
-   Duration  5.01s
+ Test Files  9 passed (9)
+      Tests  59 passed (59)
+   Duration  3.96s
+```
+
+Production Build output:
+```
+✓ built in 1.13s (main process)
+✓ built in 55ms (preload)
+out/renderer/assets/pdf.worker.min-CIqJB0yW.mjs  1,271.92 kB
+out/renderer/assets/index-l7uJo-SG.css              52.32 kB
+out/renderer/assets/index-slqlbGY4.js            1,387.13 kB
+✓ built in 13.55s
 ```
 
 Exact test breakdown:
+0. `pdfAccess.test.ts` (8 tests):
+   - Retrieves valid PDF document bytes matching vault disk content.
+   - Retrieves accurate PDF metadata for valid document ID.
+   - Rejects non-existent document ID with not-found error.
+   - Rejects invalid UUID formats via Zod schema.
+   - Rejects non-PDF files when requesting PDF bytes.
+   - Safely handles missing physical disk files with descriptive error.
+   - Guards against path traversal in relative paths (`toAbsolutePath`).
+   - Rejects untrusted sender `webContents` via `assertTrustedSender`.
 1. `taskDocs.test.ts` (8 tests):
    - Multiple assignment document attachments to a single task (`assignment_file`).
    - Multiple solution variants with distinct variant labels ("Variant A", "Variant B", "Teacher's solution").
@@ -157,19 +182,47 @@ Result: Clean production bundle created for main process (`out/main/index.js`), 
 
 ---
 
-## Next Stage: Prompt 6
+## Implementation Details for Prompt 6
 
-**Goal**: Implement the Bundled Offline PDF Rendering Engine using PDF.js.
+### Dependencies
+- Added `pdfjs-dist@6.5.438` for locally bundled, modern ES module PDF rendering.
+
+### Main Process & Security Boundary
+- `src/main/index.ts`: Updated Content Security Policy to include `worker-src 'self' blob:`; maintained strict `connect-src 'none'`, `object-src 'none'`, and `frame-src 'none'`.
+- `src/main/ipc/validation.ts`: Added `pdfDocumentBytesSchema` validating `{ documentId: uuidSchema }`.
+- `src/main/ipc/pdf.ts`: Created `registerPdfHandlers` with channels `pdf:get-document-bytes` and `pdf:get-document-metadata`. Validates caller sender, resolves vault paths with path traversal protection, checks physical existence, and streams raw `Uint8Array` bytes.
+- `src/main/ipc/index.ts`: Registered `registerPdfHandlers` with SQLite `documentRepo` and `fileLibrary`.
+
+### Shared Contracts & Preload
+- `src/shared/types.ts`: Added `PdfDocumentMetadata` interface.
+- `src/preload/index.ts`: Exposed typed `campusDeskAPI.pdf.getBytes` and `campusDeskAPI.pdf.getMetadata`.
+
+### Renderer Layer
+- `src/renderer/src/services/pdfService.ts`: Configured `pdfjsLib.GlobalWorkerOptions.workerSrc` using locally bundled Vite asset (`pdf.worker.min.mjs?url`). Provided `loadPdfDocumentFromVault`.
+- `src/renderer/src/components/PdfViewer.tsx`: Full-featured in-app PDF viewer:
+  - Header: Back to Task, breadcrumb with task title and document name, role badges, solution variant labels, attached PDF dropdown switcher (allows cycling between assignment sheet and solution variants without losing context), and external open button.
+  - Toolbar: Previous / Next page buttons, interactive page jump input (`Page X of Y`), Zoom In, Zoom Out, zoom percentage indicator, Fit-to-Width, and Reset Zoom (100%).
+  - Canvas Rendering Engine: High-DPI scaling (`window.devicePixelRatio`), render cancellation queue (`renderTask.cancel()`) to prevent race conditions during rapid navigation or resizing.
+  - Graceful loading spinner and error handling for missing/corrupted files with safe return to task.
+- `src/renderer/src/routes/TaskDetailPage.tsx`:
+  - Integrated `PdfViewer` in place of task details when a PDF document is selected.
+  - Added primary "View" button on PDF attachment items to open in-app.
+  - Added clearly labelled "Open with default app" action for non-PDF attachments (e.g. DOCX, TXT).
+  - Clicking on a PDF attachment title launches the in-app PDF viewer.
+
+---
+
+## Next Stage: Prompt 7
+
+**Goal**: Full-text / Metadata Search and Tagging / Filtering across all academic entities (Tasks, Subjects, Coursework Documents).
 
 **Pre-conditions**:
-- Task attachments (assignments, solutions, references) fully implemented and verified.
-- 51 automated unit and service tests passing.
-- Production build clean.
+- Prompt 6 complete: In-app offline PDF viewer implemented, tested, and bundled.
+- All 59 unit and integration tests passing.
+- Production build clean with bundled worker asset.
 
-**Tasks for Prompt 6**:
-1. Bundle offline PDF.js viewer into `resources/pdfjs/` without external CDN dependencies.
-2. Register local secure protocol (`campusdesk://`) in the main process to serve PDF.js and stream document bytes safely.
-3. Implement viewer window management with isolation (`nodeIntegration: false`, `contextIsolation: true`, `sandbox: true`).
-4. Wire in-app viewer to open when users click to view PDF attachments in `TaskDetailPage`, `SubjectDetailPage`, and `AllFilesPage`.
-5. Add automated and manual verification for offline PDF rendering.
-6. Update `CURRENT_STATE.md`.
+**Tasks for Prompt 7**:
+1. Implement unified search service in the main process querying across tasks, subjects, and attached document metadata.
+2. Build UI search bar and live filtering across all views (Dashboard, Tasks, Subjects, All Files).
+3. Support tag filtering and multi-criteria queries.
+4. Add automated test coverage and update documentation.

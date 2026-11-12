@@ -298,3 +298,11 @@ export interface DocumentRefCount {
   isShared: boolean
 }
 
+export interface PdfDocumentMetadata {
+  id: string
+  display_name: string
+  size_bytes: number | null
+  mime_type: string
+  created_at: string
+}
+
