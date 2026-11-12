@@ -18,5 +18,6 @@ linux:
     - deb
     - AppImage
   category: Education
+  maintainer: CampusDeck Contributors <dev@campusdeck.local>
 
 asar: true

@@ -52,13 +52,19 @@ function createWindow(): BrowserWindow {
     win.show()
   })
 
-  // Load the renderer
-  const isDev = !app.isPackaged && Boolean(process.env['ELECTRON_RENDERER_URL'])
-  if (isDev && process.env['ELECTRON_RENDERER_URL']) {
-    win.loadURL(process.env['ELECTRON_RENDERER_URL'])
-  } else {
-    win.loadFile(join(__dirname, '../renderer/index.html'))
-  }
+  // Block child window creation and external popups (strict offline sandbox)
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+
+  // Prevent arbitrary external navigation or drag-and-drop navigation
+  win.webContents.on('will-navigate', (event, url) => {
+    const isDevUrl =
+      Boolean(process.env['ELECTRON_RENDERER_URL']) &&
+      url.startsWith(process.env['ELECTRON_RENDERER_URL']!)
+    const isLocalFile = url.startsWith('file://')
+    if (!isDevUrl && !isLocalFile) {
+      event.preventDefault()
+    }
+  })
 
   return win
 }
