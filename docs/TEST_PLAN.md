@@ -240,6 +240,50 @@ Scenario: Overdue detection uses local date
   Then the task does NOT show "Overdue"
 ```
 
+### 6.7 Settings & Appearance
+
+```
+Scenario: Switch theme preference
+  Given the application is open on the Settings page
+  When I select the "Dark" theme option
+  Then the 'dark' CSS class is immediately applied to documentElement
+  And the setting is persisted in the database
+  When I reload or restart the application
+  Then the dark theme is restored automatically
+```
+
+### 6.8 Storage Usage & Data Folder
+
+```
+Scenario: Storage metrics display and Open Data Folder
+  Given the application has tasks and imported documents
+  When I open the Settings page
+  Then the Storage Utilization section shows accurate sizes for DB, Library, and File count
+  When I click "Open Data Folder"
+  Then the operating system launches the native file manager showing campusdesk_storage
+```
+
+### 6.9 Full Manual Backup & Safe Atomic Restore
+
+```
+Scenario: Export full backup ZIP
+  Given an active database with subjects, tasks, and files
+  When I click "Export Backup (.zip)" in Settings
+  And choose a save destination in the native file dialog
+  Then a valid ZIP file is created
+  And the ZIP contains campusdesk.db, library/*, and manifest.json with SHA-256 hashes
+
+Scenario: Restore from backup with confirmation warning
+  Given an existing backup ZIP file
+  When I click "Restore from Backup"
+  And select the ZIP file
+  Then a prominent Warning Modal opens warning that current data will be replaced
+  And the Restore button remains disabled until I check the confirmation checkbox
+  When I check the box and confirm Restore
+  Then the backup is staged, hashes and schema verified, files swapped, and app refreshed
+  And all subjects, tasks, and attachments match the restored backup
+```
+
 ---
 
 ## 7. Acceptance Criteria Tests (mapped from PROJECT_SPEC)
