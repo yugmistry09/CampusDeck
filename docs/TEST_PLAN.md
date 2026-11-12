@@ -175,13 +175,50 @@ Scenario: Delete task deletes its files from library
 
 ### 6.4 PDF Viewer
 
-```
-Scenario: Open a PDF offline
-  Given a task with an attached PDF
-  And the system has no network connection (or network is blocked)
-  When I click "Open" on the file
-  Then a PDF viewer window opens
-  And no network request is made (verified via electron-log / request interceptor)
+```gherkin
+Scenario: Open a PDF offline in-app
+  Given a task with an attached assignment PDF
+  And the system has no network connection (connect-src 'none' enforced)
+  When I click "View" on the PDF attachment item
+  Then the in-app PDF viewer opens within the task detail view
+  And the canvas renders the first page using the locally bundled PDF.js worker
+  And no network request is made
+
+Scenario: Navigate pages and jump to page
+  Given a multi-page PDF document is open in the viewer
+  When I click the Next Page button
+  Then the viewer advances to Page 2 of N
+  When I type "5" into the page input and press Enter
+  Then the viewer advances directly to Page 5 of N
+  And previous render tasks are cancelled gracefully without UI freeze
+
+Scenario: Zoom and Fit-to-Width
+  Given a PDF is displayed in the viewer
+  When I click the Zoom In button (+)
+  Then the zoom scale increases and canvas re-renders with sharp high-DPI resolution
+  When I click the Zoom Out button (-)
+  Then the scale decreases accordingly
+  When I click "Fit Width"
+  Then the PDF page scales dynamically to fit the width of the viewer viewport
+
+Scenario: Switch between Assignment and Solution Variants
+  Given a task with an assignment PDF and two solution variant PDFs ("Variant A", "Variant B")
+  When I open the viewer from the assignment file
+  Then the attached selector displays all 3 files with their variant tags
+  When I select "Variant A" from the Attached dropdown
+  Then the viewer switches to Variant A, resetting to Page 1 without reloading the page
+
+Scenario: Non-PDF files open with default application
+  Given a non-PDF file attached to a task (e.g. .docx or .txt)
+  When viewing the attachment item in the task detail
+  Then a clearly labelled "Open with default app" button is visible
+  When clicked, the main process launches the system default application via shell.openPath
+
+Scenario: Missing file handling
+  Given a PDF file record exists in the database but its physical file was removed
+  When I click to view the PDF
+  Then an error banner informs the user that the file is missing from vault storage
+  And a "Back to Task" button returns the user safely to the task detail
 ```
 
 ### 6.5 Completion

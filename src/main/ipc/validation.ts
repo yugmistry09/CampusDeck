@@ -145,6 +145,10 @@ export const importSubjectDocSchema = z.object({
 
 export const documentIdSchema = z.object({ documentId: uuidSchema })
 
+export const pdfDocumentBytesSchema = z.object({
+  documentId: uuidSchema
+})
+
 // ---- Task Document schemas -------------------------------------------------
 
 export const taskDocumentRoleSchema = z.enum([

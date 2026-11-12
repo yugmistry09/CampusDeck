@@ -23,6 +23,7 @@
     "better-sqlite3": "^11.5.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.460.0",
+    "pdfjs-dist": "^6.5.438",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0",
@@ -55,4 +56,3 @@
     "vitest": "^2.1.4"
   }
 }
-
