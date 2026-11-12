@@ -46,35 +46,42 @@
 | Document Opening | ✅ Complete | Secure `shell.openPath` via verified document ID only (never raw path from renderer) |
 | Non-Task Files Library | ✅ Complete | Subject Files tab and global All Files page with category tags, search, and delete |
 | Deletion Safeguards | ✅ Complete | Subject deletion sets `tasks.subject_id = NULL` (preserves tasks per D-006) and safely cleans unreferenced files |
-| Automated Tests | ✅ Complete | Vitest unit, service, and IPC test suites (10 test suites, 66 tests passing) |
+| Automated Tests | ✅ Complete | Vitest unit, service, IPC validation, stepwise migration, and domain calculation test suites (14 test suites, 103 tests passing) |
+| Release Hardening & Packaging | ✅ Complete | Window open denial, navigation block, embedded SQL migration fallback, ESLint flat config, Linux AppImage & .deb packages |
 
 ---
 
-## Exact Test Results (Prompt 7 Verification)
+## Exact Test Results (Release-Hardening Verification)
 
 Command run:
 ```bash
-npm test
+npm run lint
 npm run typecheck
+npm test
 npm run build
+npm run package
 ```
 
 Vitest output:
 ```
- ✓ src/main/db/__tests__/tasks.test.ts (12 tests)
- ✓ src/main/ipc/__tests__/pdfAccess.test.ts (8 tests)
- ✓ src/main/db/__tests__/documents.test.ts (6 tests)
- ✓ src/main/db/__tests__/subjects.test.ts (7 tests)
- ✓ src/main/services/__tests__/fileLibrary.test.ts (6 tests)
- ✓ src/main/db/__tests__/subjectDocs.test.ts (4 tests)
- ✓ src/main/db/__tests__/migrations.test.ts (4 tests)
- ✓ src/main/db/__tests__/settings.test.ts (4 tests)
- ✓ src/main/db/__tests__/taskDocs.test.ts (8 tests)
- ✓ src/main/services/__tests__/backupRestore.test.ts (7 tests)
+ ✓ src/main/db/__tests__/tasks.test.ts (12)
+ ✓ src/main/db/__tests__/domainCalculations.test.ts (11)
+ ✓ src/main/ipc/__tests__/validation.test.ts (19)
+ ✓ src/main/ipc/__tests__/pdfAccess.test.ts (8)
+ ✓ src/main/db/__tests__/documents.test.ts (6)
+ ✓ src/main/db/__tests__/subjects.test.ts (7)
+ ✓ src/main/db/__tests__/stepwiseMigrations.test.ts (2)
+ ✓ src/main/services/__tests__/fileLibrary.test.ts (6)
+ ✓ src/main/db/__tests__/subjectDocs.test.ts (4)
+ ✓ src/main/db/__tests__/taskDocs.test.ts (8)
+ ✓ src/main/services/__tests__/backupRestore.test.ts (7)
+ ✓ src/main/services/__tests__/fileLibraryErrors.test.ts (5)
+ ✓ src/main/db/__tests__/migrations.test.ts (4)
+ ✓ src/main/db/__tests__/settings.test.ts (4)
 
- Test Files  10 passed (10)
-      Tests  66 passed (66)
-   Duration  9.70s
+ Test Files  14 passed (14)
+      Tests  103 passed (103)
+   Duration  6.87s
 ```
 
 Production Build output:
@@ -276,18 +283,42 @@ Result: Clean production bundle created for main process (`out/main/index.js`), 
 
 ---
 
-## Next Stage: Prompt 8
+## Release Hardening & Packaging Stage (Complete)
 
-**Goal**: Full-text / Metadata Search and Tagging / Filtering across all academic entities (Tasks, Subjects, Coursework Documents).
+### Security Hardening
+- `src/main/index.ts`:
+  - Enforced `setWindowOpenHandler(() => ({ action: 'deny' }))` blocking child windows, popups, and arbitrary external windows.
+  - Enforced `will-navigate` listener denying any navigation away from the bundled app origin or files.
+  - Retained strict CSP (`script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none';`).
+  - Verified `nodeIntegration: false`, `contextIsolation: true`, `sandbox: true`.
 
-**Pre-conditions**:
-- Prompt 7 complete: Settings, theme switcher, storage usage, backup export, and safe atomic restore implemented, tested, and bundled.
-- All 66 unit, service, and IPC tests passing.
-- Production build clean across main, preload, and renderer.
+### Reliability & Production Migrations
+- `src/main/db/connection.ts`:
+  - Added embedded SQL migration strings as a bulletproof fallback if `.sql` files are separated from the executable directory during packaging.
+  - Updated `resolveMigrationsDir()` to probe `out/main/migrations/`, `src/main/db/migrations/`, and `process.resourcesPath/migrations/`.
+  - Package script builds and copies migrations into `out/main/migrations/`.
+- `electron-builder.yml`:
+  - Added `maintainer: CampusDeck Contributors <dev@campusdeck.local>`.
+  - Added application icon configuration (`resources/icon.png`, `resources/icons/256x256.png`).
+- `package.json`:
+  - Added `author` email, `homepage` URL, and post-build migration copy script.
+- `eslint.config.mjs`:
+  - Converted ESLint configuration to Flat Config format with `@eslint/js` and `eslint-config-prettier`. Zero lint warnings/errors.
 
-**Tasks for Prompt 8**:
-1. Implement unified search service in the main process querying across tasks, subjects, and attached document metadata.
-2. Build UI search bar and live filtering across all views (Dashboard, Tasks, Subjects, All Files).
-3. Support tag filtering and multi-criteria queries.
-4. Add automated test coverage and update documentation.
+### Packaging Deliverables (Linux x86_64)
+- `dist/CampusDeck-0.1.0.AppImage` (149 MB) — Standalone portable executable.
+- `dist/campusdesk_0.1.0_amd64.deb` (94 MB) — Debian/Ubuntu package.
+- `dist/linux-unpacked/` — Unpacked binary bundle verified with smoke run.
+
+---
+
+## Next Stage: Feature Extensions / Cross-Platform Builds
+
+**Status**: Release hardening complete. 103 tests passing, linting clean, types valid, production Linux packages generated.
+
+**Future Items**:
+1. Optional macOS / Windows build and signing pipelines (CI/CD).
+2. Advanced full-text search indexing across document contents (FTS5).
+3. Additional task tagging and custom color coding.
+
 
