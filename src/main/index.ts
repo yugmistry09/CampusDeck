@@ -10,19 +10,29 @@ import { getAppPaths } from './utils/paths'
 // ---------------------------------------------------------------------------
 // Restricts the renderer to only load local resources. No remote scripts,
 // no inline eval, no network connections for core functionality.
-const CSP = [
-  "default-src 'self'",
-  "script-src 'self'",
-  "style-src 'self' 'unsafe-inline'", // Tailwind injects critical styles
-  "img-src 'self' data:",
-  "font-src 'self' data:",
-  "connect-src 'none'",
-  "worker-src 'self' blob:",
-  "media-src 'none'",
-  "object-src 'none'",
-  "frame-src 'none'"
-].join('; ')
+const isDev = Boolean(process.env.ELECTRON_RENDERER_URL)
 
+const CSP = isDev
+  ? [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data:",
+      "font-src 'self' data:",
+      "connect-src 'self' ws://localhost:5173",
+      "object-src 'none'",
+      "frame-src 'none'"
+    ].join('; ')
+  : [
+      "default-src 'self'",
+      "script-src 'self'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data:",
+      "font-src 'self' data:",
+      "connect-src 'none'",
+      "object-src 'none'",
+      "frame-src 'none'"
+    ].join('; ')
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1280,
@@ -46,7 +56,31 @@ function createWindow(): BrowserWindow {
       allowRunningInsecureContent: false
     }
   })
+  if (process.env.ELECTRON_RENDERER_URL) {
+  console.log('Loading renderer URL:', process.env.ELECTRON_RENDERER_URL)
 
+  win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    console.error('Renderer failed to load:', {
+      errorCode,
+      errorDescription,
+      validatedURL
+    })
+  })
+
+  win.webContents.on('did-finish-load', () => {
+    console.log('Renderer finished loading')
+  })
+
+  win.webContents.on('render-process-gone', (_event, details) => {
+    console.error('Renderer process gone:', details)
+  })
+
+  win.loadURL(process.env.ELECTRON_RENDERER_URL)
+} else {
+  console.log('Loading production renderer')
+
+  win.loadFile(join(__dirname, '../renderer/index.html'))
+}
   // Graceful show: wait until content is rendered before displaying window
   win.once('ready-to-show', () => {
     win.show()
