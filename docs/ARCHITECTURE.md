@@ -16,7 +16,7 @@ Electron runs three distinct JavaScript contexts. CampusDeck keeps them strictly
 │  nodeIntegration: false  │  contextIsolation: true             │
 │  No direct Node or FS access                                    │
 │                          │                                      │
-│          window.campusDeskAPI  (exposed by preload)             │
+│          window.campusDeckAPI  (exposed by preload)             │
 └─────────────────────────┬───────────────────────────────────────┘
                           │ contextBridge + typed IPC channels
 ┌─────────────────────────▼───────────────────────────────────────┐
@@ -68,7 +68,7 @@ CampusDeck/
 │   │       └── paths.ts        ← Resolves userData, library, backup paths
 │   │
 │   ├── preload/
-│   │   └── index.ts            ← contextBridge.exposeInMainWorld('campusDeskAPI', …)
+│   │   └── index.ts            ← contextBridge.exposeInMainWorld('campusDeckAPI', …)
 │   │
 │   └── renderer/
 │       ├── index.html          ← Shell HTML
@@ -162,7 +162,7 @@ async functions. The main process registers handlers in `src/main/ipc/`.
 The preload script exposes **one** object on `window`:
 
 ```typescript
-window.campusDeskAPI = {
+window.campusDeckAPI = {
   tasks: { list, get, create, update, archive, delete, completion },
   subjects: { list, get, create, update, delete },
   files: { import, delete, open, list, listAll },
@@ -205,7 +205,7 @@ The PDF.js viewer opens in a **separate** `BrowserWindow` with:
 ```
 User picks a file in renderer
         ↓
-renderer calls window.campusDeskAPI.files.import(sourcePath, role, taskId, displayName)
+renderer calls window.campusDeckAPI.files.import(sourcePath, role, taskId, displayName)
         ↓
 IPC channel: "file:import"
         ↓
@@ -228,7 +228,7 @@ Returns FileRecord to renderer
 
 ```
 App launch  ──→  backup.ts
-                   • Opens <userData>/campusdesk.db
+                   • Opens <userData>/campusdeck.db
                    • sqlite3 backup API → <userData>/backups/<timestamp>.db
                    • Prunes backups older than configurable retention window
                    • Default: keep last 30 daily backups
@@ -242,7 +242,7 @@ No network is used. Restore is manual (documented in Settings view).
 
 - PDF.js is downloaded and bundled in `resources/pdfjs/` during setup (before first build).
 - The viewer HTML (`resources/pdfjs/web/viewer.html`) is served via a custom local
-  `campusdesk://` protocol registered in the main process.
+  `campusdeck://` protocol registered in the main process.
 - The file bytes are read by the main process (has FS access) and streamed to the
   protocol response. The renderer and viewer never see the absolute path of the file.
 

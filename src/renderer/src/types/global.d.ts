@@ -1,8 +1,8 @@
 /// <reference types="vite/client" />
-import type { CampusDeskAPI } from '../../../preload/index'
+import type { CampusDeckAPI } from '../../../preload/index'
 
 declare global {
   interface Window {
-    campusDeskAPI: CampusDeskAPI
+    campusDeckAPI: CampusDeckAPI
   }
 }

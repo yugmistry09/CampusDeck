@@ -52,7 +52,7 @@ export const TaskAttachmentEditModal: React.FC<TaskAttachmentEditModalProps> = (
     setError(null)
 
     try {
-      const updated = await window.campusDeskAPI.taskDocs.update({
+      const updated = await window.campusDeckAPI.taskDocs.update({
         id: attachment.id,
         display_name: displayName.trim(),
         role,

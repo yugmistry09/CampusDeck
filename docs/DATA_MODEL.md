@@ -266,7 +266,7 @@ Persistent data is located in a dedicated directory beneath Electron's `userData
 
 | Path | Contents |
 |---|---|
-| `<userData>/campusdesk_storage/` | Dedicated application data root |
-| `<userData>/campusdesk_storage/campusdesk.db` | Embedded SQLite database file |
-| `<userData>/campusdesk_storage/library/` | Managed local file storage root |
-| `<userData>/campusdesk_storage/backups/` | Scheduled database snapshots |
+| `<userData>/campusdeck_storage/` | Dedicated application data root |
+| `<userData>/campusdeck_storage/campusdeck.db` | Embedded SQLite database file |
+| `<userData>/campusdeck_storage/library/` | Managed local file storage root |
+| `<userData>/campusdeck_storage/backups/` | Scheduled database snapshots |

@@ -17,8 +17,8 @@
 | Desktop Runtime | ✅ Complete | Electron v33.2.0, electron-vite v2.3.0, TypeScript v5.6.3 (strict mode) |
 | UI Framework & Styling | ✅ Complete | React 18, Tailwind CSS 3.4 (dark mode `class` strategy), Lucide Icons, responsive shell |
 | Security Boundary | ✅ Complete | `nodeIntegration: false`, `contextIsolation: true`, `sandbox: true`, restrictive CSP with `worker-src 'self' blob:` and `connect-src 'none'`, `assertTrustedSender` window verification |
-| Preload API | ✅ Complete | Narrow, typed `contextBridge` exposing `window.campusDeskAPI` (including `pdf.getBytes` and `pdf.getMetadata`) |
-| Storage Location | ✅ Complete | Dedicated directory beneath `userData`: `<userData>/campusdesk_storage/` (db, library, backups) |
+| Preload API | ✅ Complete | Narrow, typed `contextBridge` exposing `window.campusDeckAPI` (including `pdf.getBytes` and `pdf.getMetadata`) |
+| Storage Location | ✅ Complete | Dedicated directory beneath `userData`: `<userData>/campusdeck_storage/` (db, library, backups) |
 | Database Engine | ✅ Complete | SQLite via `better-sqlite3` in WAL mode, `foreign_keys = ON`, `synchronous = NORMAL` |
 | Migrations | ✅ Complete | 3 versioned migrations (`001_initial.sql`, `002_subject_fields_and_categories.sql`, `003_task_attachment_roles.sql`) with `schema_migrations` tracking |
 | Relational Schema | ✅ Complete | `subjects`, `tasks`, `documents`, `task_documents`, `subject_documents`, `settings` (key-value) |
@@ -98,7 +98,7 @@ Exact test breakdown:
 0. `backupRestore.test.ts` (7 tests):
    - Performs complete round-trip backup and restore with SHA-256 file integrity verification.
    - Strictly rejects corrupt or malformed archive files without affecting current app state.
-   - Strictly rejects archives missing `manifest.json` or `campusdesk.db`.
+   - Strictly rejects archives missing `manifest.json` or `campusdeck.db`.
    - Strictly rejects malicious archives containing path traversal (`../` or absolute) entries.
    - Rejects archives with incompatible future schema versions.
    - Detects missing files or checksum mismatches declared in manifest and initiates rollback.
@@ -190,7 +190,7 @@ Result: Clean production bundle created for main process (`out/main/index.js`), 
 - `src/main/services/fileLibrary.ts`: Added multi-file selection support in `showNativeFileDialog`, enhanced `importTaskDocument`, and added `importMultipleTaskDocuments`.
 - `src/main/ipc/taskDocs.ts`: Registered IPC handlers for `task-doc:list`, `task-doc:list-by-subject`, `task-doc:list-all`, `task-doc:select-and-import`, `task-doc:update`, `task-doc:unlink`, `task-doc:delete`, and `task-doc:ref-count`.
 - `src/main/ipc/index.ts`: Wired `taskDocRepo` and `registerTaskDocHandlers`.
-- `src/preload/index.ts`: Exposed `window.campusDeskAPI.taskDocs` methods.
+- `src/preload/index.ts`: Exposed `window.campusDeckAPI.taskDocs` methods.
 
 ### Renderer & UI Layer
 - `src/renderer/src/components/TaskAttachmentModal.tsx`: File upload modal supporting multi-file selection, role picker (`assignment_file`, `solution`, `reference`, `other`), solution variant label with quick suggestion chips, and custom display name.
@@ -215,7 +215,7 @@ Result: Clean production bundle created for main process (`out/main/index.js`), 
 
 ### Shared Contracts & Preload
 - `src/shared/types.ts`: Added `PdfDocumentMetadata` interface.
-- `src/preload/index.ts`: Exposed typed `campusDeskAPI.pdf.getBytes` and `campusDeskAPI.pdf.getMetadata`.
+- `src/preload/index.ts`: Exposed typed `campusDeckAPI.pdf.getBytes` and `campusDeckAPI.pdf.getMetadata`.
 
 ### Renderer Layer
 - `src/renderer/src/services/pdfService.ts`: Configured `pdfjsLib.GlobalWorkerOptions.workerSrc` using locally bundled Vite asset (`pdf.worker.min.mjs?url`). Provided `loadPdfDocumentFromVault`.
@@ -247,14 +247,14 @@ Result: Clean production bundle created for main process (`out/main/index.js`), 
     - Inspects current schema version from `schema_migrations` table.
     - Scans all files in `library/`, computing SHA-256 integrity checksums for each file.
     - Generates `manifest.json` containing `format_version: 1`, `schema_version`, `app_version`, `created_at`, `total_files`, and `files` array.
-    - Packages `manifest.json`, `campusdesk.db`, and all managed files into a user-selected ZIP archive.
+    - Packages `manifest.json`, `campusdeck.db`, and all managed files into a user-selected ZIP archive.
   - `restoreBackup(archivePath, onDatabaseReopened)`:
     - Stage 1 — Validation: Inspects ZIP entries, rejects corrupt/malformed archives, strictly validates that no entries contain path traversal sequences (`../`, absolute paths, drive letters).
-    - Stage 2 — Manifest & Schema Check: Verifies presence of `manifest.json` and `campusdesk.db`, verifies manifest schema version against current database migrations.
+    - Stage 2 — Manifest & Schema Check: Verifies presence of `manifest.json` and `campusdeck.db`, verifies manifest schema version against current database migrations.
     - Stage 3 — Staged Extraction: Extracts into an isolated timestamped staging directory (`<appDataDir>/staging_restore_<timestamp>/`). Computes SHA-256 for all extracted files and verifies match against manifest.
     - Stage 4 — Safe Atomic Swap & Rollback:
       - Closes existing database connection (`closeDatabase()`).
-      - Moves existing `campusdesk.db` (plus WAL/SHM) and `library/` into a backup rollback directory (`<appDataDir>/pre_restore_rollback_<timestamp>/`).
+      - Moves existing `campusdeck.db` (plus WAL/SHM) and `library/` into a backup rollback directory (`<appDataDir>/pre_restore_rollback_<timestamp>/`).
       - Moves staged database and library into place.
       - If any step fails, automatically triggers rollback restoring the previous database and library.
       - Reopens database via `openDatabase()` and invokes `onDatabaseReopened(newDb)`.
@@ -268,7 +268,7 @@ Result: Clean production bundle created for main process (`out/main/index.js`), 
 - `src/shared/types.ts`:
   - Added types: `StorageUsageInfo`, `BackupManifestFileEntry`, `BackupManifest`, `BackupExportResult`, `BackupRestoreResult`, `BackupValidationResult`.
 - `src/preload/index.ts`:
-  - Exposed `campusDeskAPI.settings.getStorageUsage()`, `campusDeskAPI.settings.openDataFolder()`, `campusDeskAPI.backup.export()`, and `campusDeskAPI.backup.restore()`.
+  - Exposed `campusDeckAPI.settings.getStorageUsage()`, `campusDeckAPI.settings.openDataFolder()`, `campusDeckAPI.backup.export()`, and `campusDeckAPI.backup.restore()`.
 
 ### Renderer Layer
 - `src/renderer/src/routes/SettingsPage.tsx`:
@@ -307,7 +307,7 @@ Result: Clean production bundle created for main process (`out/main/index.js`), 
 
 ### Packaging Deliverables (Linux x86_64)
 - `dist/CampusDeck-0.1.0.AppImage` (149 MB) — Standalone portable executable.
-- `dist/campusdesk_0.1.0_amd64.deb` (94 MB) — Debian/Ubuntu package.
+- `dist/campusdeck_0.1.0_amd64.deb` (94 MB) — Debian/Ubuntu package.
 - `dist/linux-unpacked/` — Unpacked binary bundle verified with smoke run.
 
 ---

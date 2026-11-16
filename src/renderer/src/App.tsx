@@ -33,8 +33,8 @@ export const App: React.FC = () => {
 
   // Load saved theme on startup
   useEffect(() => {
-    if (window.campusDeskAPI?.settings?.get) {
-      window.campusDeskAPI.settings
+    if (window.campusDeckAPI?.settings?.get) {
+      window.campusDeckAPI.settings
         .get()
         .then((res) => {
           if (res?.theme) setTheme(res.theme)
@@ -45,8 +45,8 @@ export const App: React.FC = () => {
 
   const handleThemeChange = (newTheme: ThemeMode) => {
     setTheme(newTheme)
-    if (window.campusDeskAPI?.settings?.set) {
-      window.campusDeskAPI.settings.set({ theme: newTheme }).catch(console.error)
+    if (window.campusDeckAPI?.settings?.set) {
+      window.campusDeckAPI.settings.set({ theme: newTheme }).catch(console.error)
     }
   }
 

@@ -71,7 +71,7 @@ export const TaskAttachmentModal: React.FC<TaskAttachmentModalProps> = ({
     setError(null)
 
     try {
-      const result = await window.campusDeskAPI.taskDocs.selectAndImport({
+      const result = await window.campusDeckAPI.taskDocs.selectAndImport({
         taskId,
         role,
         variantLabel: role === 'solution' && variantLabel.trim() ? variantLabel.trim() : null,

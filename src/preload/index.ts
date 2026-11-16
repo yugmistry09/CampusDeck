@@ -43,7 +43,7 @@ function invoke<T>(channel: string, payload?: unknown): Promise<T> {
 }
 
 // ---------------------------------------------------------------------------
-// The typed API surface exposed as window.campusDeskAPI
+// The typed API surface exposed as window.campusDeckAPI
 // ---------------------------------------------------------------------------
 const api = {
   subjects: {
@@ -138,8 +138,8 @@ const api = {
   }
 } as const
 
-// Expose on window.campusDeskAPI — the sole entry point from the renderer.
-contextBridge.exposeInMainWorld('campusDeskAPI', api)
+// Expose on window.campusDeckAPI — the sole entry point from the renderer.
+contextBridge.exposeInMainWorld('campusDeckAPI', api)
 
 // Export the type so renderer TypeScript files can reference it
-export type CampusDeskAPI = typeof api
+export type CampusDeckAPI = typeof api

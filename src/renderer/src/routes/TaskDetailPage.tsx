@@ -131,7 +131,7 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
 
   const loadTask = useCallback(async () => {
     try {
-      const data = await window.campusDeskAPI.tasks.getWithSubject(taskId)
+      const data = await window.campusDeckAPI.tasks.getWithSubject(taskId)
       setTask(data)
     } catch (err) {
       console.error('Failed to load task:', err)
@@ -144,7 +144,7 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
 
   const loadAttachments = useCallback(async () => {
     try {
-      const docs = await window.campusDeskAPI.taskDocs.list(taskId)
+      const docs = await window.campusDeckAPI.taskDocs.list(taskId)
       setAttachments(docs)
     } catch (err) {
       console.error('Failed to load task attachments:', err)
@@ -183,7 +183,7 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
 
   const handleStatusChange = async (newStatus: TaskStatus) => {
     try {
-      const updated = await window.campusDeskAPI.tasks.update({ id: task.id, status: newStatus })
+      const updated = await window.campusDeckAPI.tasks.update({ id: task.id, status: newStatus })
       if (updated) {
         loadTask()
         onTaskUpdated?.()
@@ -202,7 +202,7 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
 
   const handleToggleArchive = async () => {
     try {
-      await window.campusDeskAPI.tasks.archive(task.id, !isArchived)
+      await window.campusDeckAPI.tasks.archive(task.id, !isArchived)
       setIsArchiveModalOpen(false)
       loadTask()
       onTaskUpdated?.()
@@ -220,7 +220,7 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
 
   const handleDeleteTask = async () => {
     try {
-      await window.campusDeskAPI.tasks.delete(task.id)
+      await window.campusDeckAPI.tasks.delete(task.id)
       setIsDeleteModalOpen(false)
       onTaskDeleted()
     } catch (err) {
@@ -254,7 +254,7 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
   // Open file in OS default application
   const handleOpenInDefaultApp = async (doc: TaskDocumentRecord) => {
     try {
-      await window.campusDeskAPI.files.openDocument(doc.document_id)
+      await window.campusDeckAPI.files.openDocument(doc.document_id)
     } catch (err) {
       setNotification({
         type: 'error',
@@ -267,7 +267,7 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
   const handleUnlinkConfirm = async () => {
     if (!attachmentToUnlink) return
     try {
-      await window.campusDeskAPI.taskDocs.unlink(attachmentToUnlink.id)
+      await window.campusDeckAPI.taskDocs.unlink(attachmentToUnlink.id)
       setAttachmentToUnlink(null)
       loadAttachments()
       setNotification({
@@ -285,7 +285,7 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
   // Delete attachment (checks reference count for safety)
   const handleInitiateDelete = async (doc: TaskDocumentRecord) => {
     try {
-      const refCount = await window.campusDeskAPI.taskDocs.getRefCount(doc.document_id)
+      const refCount = await window.campusDeckAPI.taskDocs.getRefCount(doc.document_id)
       setDeleteRefInfo(refCount)
       setAttachmentToDelete(doc)
     } catch (err) {
@@ -299,7 +299,7 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
   const handleDeleteConfirm = async () => {
     if (!attachmentToDelete) return
     try {
-      const result = await window.campusDeskAPI.taskDocs.delete(attachmentToDelete.id)
+      const result = await window.campusDeckAPI.taskDocs.delete(attachmentToDelete.id)
       setAttachmentToDelete(null)
       setDeleteRefInfo(null)
       loadAttachments()
