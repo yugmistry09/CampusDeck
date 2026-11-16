@@ -63,12 +63,12 @@ export function registerSettingsHandlers(
     assertTrustedSender(event.sender)
     const window = BrowserWindow.fromWebContents(event.sender)
     const now = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-    const defaultFilename = `campusdesk_backup_${now}.zip`
+    const defaultFilename = `campusdeck_backup_${now}.zip`
 
     const { canceled, filePath } = await dialog.showSaveDialog(window!, {
-      title: 'Export CampusDesk Backup Archive',
+      title: 'Export CampusDeck Backup Archive',
       defaultPath: defaultFilename,
-      filters: [{ name: 'CampusDesk Backup Archive', extensions: ['zip'] }]
+      filters: [{ name: 'CampusDeck Backup Archive', extensions: ['zip'] }]
     })
 
     if (canceled || !filePath) {
@@ -84,9 +84,9 @@ export function registerSettingsHandlers(
     const window = BrowserWindow.fromWebContents(event.sender)
 
     const { canceled, filePaths } = await dialog.showOpenDialog(window!, {
-      title: 'Select CampusDesk Backup Archive (.zip) to Restore',
+      title: 'Select CampusDeck Backup Archive (.zip) to Restore',
       properties: ['openFile'],
-      filters: [{ name: 'CampusDesk Backup Archive', extensions: ['zip'] }]
+      filters: [{ name: 'CampusDeck Backup Archive', extensions: ['zip'] }]
     })
 
     if (canceled || !filePaths || filePaths.length === 0 || !filePaths[0]) {

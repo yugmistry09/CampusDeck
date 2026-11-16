@@ -58,9 +58,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   const loadDashboardData = useCallback(async () => {
     try {
       const [dashStats, subsWithStats, soonTasks] = await Promise.all([
-        window.campusDeskAPI.tasks.dashboardStats(),
-        window.campusDeskAPI.subjects.listWithStats(),
-        window.campusDeskAPI.tasks.dueSoon(14) // next 14 days
+        window.campusDeckAPI.tasks.dashboardStats(),
+        window.campusDeckAPI.subjects.listWithStats(),
+        window.campusDeckAPI.tasks.dueSoon(14) // next 14 days
       ])
 
       setStats(dashStats)
@@ -78,7 +78,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   const handleToggleTask = async (task: TaskWithSubject) => {
     const nextStatus: TaskStatus = task.status === 'completed' ? 'todo' : 'completed'
     try {
-      await window.campusDeskAPI.tasks.update({ id: task.id, status: nextStatus })
+      await window.campusDeckAPI.tasks.update({ id: task.id, status: nextStatus })
       loadDashboardData()
       setNotification({
         type: 'success',

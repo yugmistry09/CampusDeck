@@ -77,7 +77,7 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
           color: color.trim() || null,
           notes: notes.trim()
         }
-        const updated = await window.campusDeskAPI.subjects.update(updatePayload)
+        const updated = await window.campusDeckAPI.subjects.update(updatePayload)
         if (updated) {
           onSaved(updated)
           onClose()
@@ -90,7 +90,7 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
           color: color.trim() || null,
           notes: notes.trim()
         }
-        const created = await window.campusDeskAPI.subjects.create(createPayload)
+        const created = await window.campusDeckAPI.subjects.create(createPayload)
         onSaved(created)
         onClose()
       }

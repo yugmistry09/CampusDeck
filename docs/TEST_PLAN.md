@@ -151,7 +151,7 @@ file system chain.
 
 ## 5. Unit Tests — React Components
 
-Use Vitest + `@testing-library/react` + jsdom. These tests mock `window.campusDeskAPI`.
+Use Vitest + `@testing-library/react` + jsdom. These tests mock `window.campusDeckAPI`.
 
 | Component | Test |
 |---|---|
@@ -305,7 +305,7 @@ Scenario: Storage metrics display and Open Data Folder
   When I open the Settings page
   Then the Storage Utilization section shows accurate sizes for DB, Library, and File count
   When I click "Open Data Folder"
-  Then the operating system launches the native file manager showing campusdesk_storage
+  Then the operating system launches the native file manager showing campusdeck_storage
 ```
 
 ### 6.9 Full Manual Backup & Safe Atomic Restore
@@ -316,7 +316,7 @@ Scenario: Export full backup ZIP
   When I click "Export Backup (.zip)" in Settings
   And choose a save destination in the native file dialog
   Then a valid ZIP file is created
-  And the ZIP contains campusdesk.db, library/*, and manifest.json with SHA-256 hashes
+  And the ZIP contains campusdeck.db, library/*, and manifest.json with SHA-256 hashes
 
 Scenario: Restore from backup with confirmation warning
   Given an existing backup ZIP file
@@ -349,10 +349,10 @@ Scenario: Restore from backup with confirmation warning
 These checks are verified for every release:
 
 - [x] Renderer DevTools: `window.require` is undefined (`nodeIntegration: false`, `sandbox: true`).
-- [x] Renderer DevTools: `window.campusDeskAPI` exposes only the named methods via `contextBridge`; no raw Node APIs or filesystem objects.
+- [x] Renderer DevTools: `window.campusDeckAPI` exposes only the named methods via `contextBridge`; no raw Node APIs or filesystem objects.
 - [x] Opening a PDF: Zero external network requests made; 100% offline local PDF worker; `connect-src 'none'` enforced.
 - [x] Navigation & Window Open Denial: `setWindowOpenHandler` denies all popups; `will-navigate` blocks all external navigations.
-- [x] Storage Boundary: All writes strictly sandboxed inside `<userData>/campusdesk_storage/`; path traversal attacks rejected.
+- [x] Storage Boundary: All writes strictly sandboxed inside `<userData>/campusdeck_storage/`; path traversal attacks rejected.
 - [x] CSP header enforced on `BrowserWindow`: `default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none';`.
 
 ---

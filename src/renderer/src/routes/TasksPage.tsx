@@ -64,9 +64,9 @@ export const TasksPage: React.FC = () => {
   const loadData = useCallback(async () => {
     try {
       const [allTasks, allSubjects, allAttachments] = await Promise.all([
-        window.campusDeskAPI.tasks.list({ includeArchived: true }),
-        window.campusDeskAPI.subjects.list(),
-        window.campusDeskAPI.taskDocs.listAll()
+        window.campusDeckAPI.tasks.list({ includeArchived: true }),
+        window.campusDeckAPI.subjects.list(),
+        window.campusDeckAPI.taskDocs.listAll()
       ])
       setTasks(allTasks)
       setSubjects(allSubjects)
@@ -189,7 +189,7 @@ export const TasksPage: React.FC = () => {
     else nextStatus = 'todo'
 
     try {
-      await window.campusDeskAPI.tasks.update({ id: task.id, status: nextStatus })
+      await window.campusDeckAPI.tasks.update({ id: task.id, status: nextStatus })
       loadData()
       setNotification({
         type: 'success',
@@ -208,7 +208,7 @@ export const TasksPage: React.FC = () => {
     if (!taskToArchive) return
     const willArchive = taskToArchive.is_archived === 0
     try {
-      await window.campusDeskAPI.tasks.archive(taskToArchive.id, willArchive)
+      await window.campusDeckAPI.tasks.archive(taskToArchive.id, willArchive)
       setTaskToArchive(null)
       loadData()
       setNotification({
@@ -227,7 +227,7 @@ export const TasksPage: React.FC = () => {
   const handleDeleteConfirm = async () => {
     if (!taskToDelete) return
     try {
-      await window.campusDeskAPI.tasks.delete(taskToDelete.id)
+      await window.campusDeckAPI.tasks.delete(taskToDelete.id)
       setTaskToDelete(null)
       loadData()
       setNotification({ type: 'success', message: 'Task deleted from vault.' })

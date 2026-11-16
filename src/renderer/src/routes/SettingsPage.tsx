@@ -63,12 +63,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   } | null>(null)
 
   const loadData = useCallback(async () => {
-    if (!window.campusDeskAPI?.settings) return
+    if (!window.campusDeckAPI?.settings) return
 
     try {
       const [pathsRes, settingsRes] = await Promise.all([
-        window.campusDeskAPI.settings.getPaths(),
-        window.campusDeskAPI.settings.get()
+        window.campusDeckAPI.settings.getPaths(),
+        window.campusDeckAPI.settings.get()
       ])
       setPaths(pathsRes)
       setSettings(settingsRes)
@@ -81,10 +81,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   }, [])
 
   const loadStorageUsage = useCallback(async () => {
-    if (!window.campusDeskAPI?.settings?.getStorageUsage) return
+    if (!window.campusDeckAPI?.settings?.getStorageUsage) return
     setIsLoadingUsage(true)
     try {
-      const usage = await window.campusDeskAPI.settings.getStorageUsage()
+      const usage = await window.campusDeckAPI.settings.getStorageUsage()
       setStorageUsage(usage)
     } catch (err) {
       console.error('Failed to load storage usage:', err)
@@ -108,7 +108,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     setActiveTheme(mode)
     onThemeChange?.(mode)
     try {
-      await window.campusDeskAPI.settings.set({ theme: mode })
+      await window.campusDeckAPI.settings.set({ theme: mode })
     } catch (err) {
       console.error('Failed to persist theme setting:', err)
     }
@@ -116,7 +116,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
   const handleOpenDataFolder = async () => {
     try {
-      await window.campusDeskAPI.settings.openDataFolder()
+      await window.campusDeckAPI.settings.openDataFolder()
     } catch (err) {
       setNotification({
         type: 'error',
@@ -131,7 +131,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     setNotification(null)
 
     try {
-      const result = await window.campusDeskAPI.backup.export()
+      const result = await window.campusDeckAPI.backup.export()
       if (result.canceled) {
         setIsExporting(false)
         return
@@ -160,7 +160,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     setIsRestoring(true)
 
     try {
-      const result = await window.campusDeskAPI.backup.restore()
+      const result = await window.campusDeckAPI.backup.restore()
       if (result.canceled) {
         setIsRestoring(false)
         return

@@ -45,7 +45,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
 
     try {
       setIsImporting(true)
-      const res = await window.campusDeskAPI.files.selectAndImportSubjectDoc({
+      const res = await window.campusDeckAPI.files.selectAndImportSubjectDoc({
         subjectId,
         title: trimmedTitle,
         type: category,
