@@ -62,8 +62,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
   // Load subject list for dropdown
   useEffect(() => {
-    if (isOpen && window.campusDeskAPI?.subjects?.list) {
-      window.campusDeskAPI.subjects
+    if (isOpen && window.campusDeckAPI?.subjects?.list) {
+      window.campusDeckAPI.subjects
         .list()
         .then(setSubjects)
         .catch(console.error)
@@ -127,7 +127,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           status,
           description: description.trim()
         }
-        const updated = await window.campusDeskAPI.tasks.update(updateInput)
+        const updated = await window.campusDeckAPI.tasks.update(updateInput)
         if (updated) {
           onSaved(updated)
           onClose()
@@ -142,7 +142,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           status,
           description: description.trim()
         }
-        const created = await window.campusDeskAPI.tasks.create(createInput)
+        const created = await window.campusDeckAPI.tasks.create(createInput)
         onSaved(created)
         onClose()
       }
