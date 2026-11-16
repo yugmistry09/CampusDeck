@@ -232,7 +232,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
 
   const handleOpenInDefaultApp = async () => {
     try {
-      await window.campusDeskAPI.files.openDocument(activeDoc.document_id)
+      await window.campusDeckAPI.files.openDocument(activeDoc.document_id)
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Could not open file in default application')
     }

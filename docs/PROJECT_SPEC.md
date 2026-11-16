@@ -109,10 +109,10 @@ subject_completion  = completed_non_archived_tasks_for_subject / all_non_archive
 
 - An automatic SQLite backup copy is written to `<userData>/backups/` on each app launch
   and on a configurable schedule (default: daily).
-- Backup filenames include an ISO 8601 timestamp: `campusdesk_backup_2026-10-29T18-00-00.db`.
+- Backup filenames include an ISO 8601 timestamp: `campusdeck_backup_2026-10-29T18-00-00.db`.
 - The managed library files are **not** automatically backed up in V1 (this is documented
   as a known limitation and future feature).
-- Restore is manual: user replaces `campusdesk.db` with a backup copy.
+- Restore is manual: user replaces `campusdeck.db` with a backup copy.
 
 ---
 
@@ -202,7 +202,7 @@ The following are explicitly **not** part of V1:
 |---|---|---|
 | Source code | `/home/yug/Files/CODES/CampusDeck/` | Yes |
 | `node_modules` | `/home/yug/Files/CODES/CampusDeck/node_modules/` | No (gitignored) |
-| SQLite database | `~/.config/CampusDeck/campusdesk.db` | No |
+| SQLite database | `~/.config/CampusDeck/campusdeck.db` | No |
 | File library | `~/.config/CampusDeck/library/` | No |
 | Backups | `~/.config/CampusDeck/backups/` | No |
 | Planning docs | `/home/yug/Files/CODES/CampusDeck/docs/` | Yes |

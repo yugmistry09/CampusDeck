@@ -14,7 +14,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 export async function loadPdfDocumentFromVault(
   documentId: string
 ): Promise<pdfjsLib.PDFDocumentProxy> {
-  const bytes = await window.campusDeskAPI.pdf.getBytes(documentId)
+  const bytes = await window.campusDeckAPI.pdf.getBytes(documentId)
 
   // Use a detached Uint8Array copy if necessary for transferable worker buffers
   const dataCopy = new Uint8Array(bytes)

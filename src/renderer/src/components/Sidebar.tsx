@@ -33,7 +33,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
         </div>
         <div className="flex flex-col">
           <span className="font-semibold text-sm tracking-tight text-slate-900 dark:text-slate-100">
-            CampusDesk
+            CampusDeck
           </span>
           <span className="text-[10px] text-slate-500 dark:text-slate-400 -mt-0.5">
             Local-First Academic Suite

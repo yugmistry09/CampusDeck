@@ -107,10 +107,10 @@ export const SubjectDetailPage: React.FC<SubjectDetailPageProps> = ({
   const loadSubjectData = useCallback(async () => {
     try {
       const [stats, docs, subTasks, attachments] = await Promise.all([
-        window.campusDeskAPI.subjects.getWithStats(subjectId),
-        window.campusDeskAPI.subjectDocs.list(subjectId),
-        window.campusDeskAPI.tasks.list({ subjectId, includeArchived: true }),
-        window.campusDeskAPI.taskDocs.listBySubject(subjectId)
+        window.campusDeckAPI.subjects.getWithStats(subjectId),
+        window.campusDeckAPI.subjectDocs.list(subjectId),
+        window.campusDeckAPI.tasks.list({ subjectId, includeArchived: true }),
+        window.campusDeckAPI.taskDocs.listBySubject(subjectId)
       ])
       if (stats) setSubject(stats)
       setDocuments(docs)
@@ -142,7 +142,7 @@ export const SubjectDetailPage: React.FC<SubjectDetailPageProps> = ({
 
   const handleDeleteSubject = async () => {
     try {
-      await window.campusDeskAPI.subjects.delete(subjectId)
+      await window.campusDeckAPI.subjects.delete(subjectId)
       setIsDeleteModalOpen(false)
       onSubjectDeleted()
     } catch (err) {
@@ -156,7 +156,7 @@ export const SubjectDetailPage: React.FC<SubjectDetailPageProps> = ({
   const handleDeleteDocument = async () => {
     if (!docToDelete) return
     try {
-      await window.campusDeskAPI.subjectDocs.delete(docToDelete.id)
+      await window.campusDeckAPI.subjectDocs.delete(docToDelete.id)
       setDocToDelete(null)
       loadSubjectData()
       setNotification({ type: 'success', message: `Document "${docToDelete.title}" deleted.` })
@@ -171,7 +171,7 @@ export const SubjectDetailPage: React.FC<SubjectDetailPageProps> = ({
   const handleOpenDocument = async (doc: SubjectDocumentRecord) => {
     if (!doc.document_id) return
     try {
-      await window.campusDeskAPI.files.openDocument(doc.document_id)
+      await window.campusDeckAPI.files.openDocument(doc.document_id)
     } catch (err) {
       setNotification({
         type: 'error',
@@ -186,7 +186,7 @@ export const SubjectDetailPage: React.FC<SubjectDetailPageProps> = ({
     else if (t.status === 'in_progress') next = 'completed'
     else next = 'todo'
     try {
-      await window.campusDeskAPI.tasks.update({ id: t.id, status: next })
+      await window.campusDeckAPI.tasks.update({ id: t.id, status: next })
       loadSubjectData()
       setNotification({ type: 'success', message: 'Task status updated.' })
     } catch (err) {
@@ -197,7 +197,7 @@ export const SubjectDetailPage: React.FC<SubjectDetailPageProps> = ({
   const handleArchiveTaskConfirm = async () => {
     if (!taskToArchive) return
     try {
-      await window.campusDeskAPI.tasks.archive(taskToArchive.id, taskToArchive.is_archived === 0)
+      await window.campusDeckAPI.tasks.archive(taskToArchive.id, taskToArchive.is_archived === 0)
       setTaskToArchive(null)
       loadSubjectData()
       setNotification({ type: 'success', message: 'Task archive state updated.' })
@@ -209,7 +209,7 @@ export const SubjectDetailPage: React.FC<SubjectDetailPageProps> = ({
   const handleDeleteTaskConfirm = async () => {
     if (!taskToDelete) return
     try {
-      await window.campusDeskAPI.tasks.delete(taskToDelete.id)
+      await window.campusDeckAPI.tasks.delete(taskToDelete.id)
       setTaskToDelete(null)
       loadSubjectData()
       setNotification({ type: 'success', message: 'Task deleted.' })

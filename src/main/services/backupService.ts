@@ -116,7 +116,7 @@ export function createBackupService(
       }
 
       // 1. Consistent SQLite online snapshot
-      const tempDbSnapshot = join(tempDir, 'campusdesk.db')
+      const tempDbSnapshot = join(tempDir, 'campusdeck.db')
       await db.backup(tempDbSnapshot)
 
       // 2. Gather library files & compute integrity hashes
@@ -148,7 +148,7 @@ export function createBackupService(
         app_version: appVersion,
         created_at: new Date().toISOString(),
         schema_version: schemaVersion,
-        database_file: 'campusdesk.db',
+        database_file: 'campusdeck.db',
         files: manifestFiles
       }
 
@@ -221,14 +221,14 @@ export function createBackupService(
 
     // Required files check
     const manifestEntry = entries.find((e) => e.entryName === 'manifest.json')
-    const dbEntry = entries.find((e) => e.entryName === 'campusdesk.db')
+    const dbEntry = entries.find((e) => e.entryName === 'campusdeck.db')
 
     if (!manifestEntry) {
       return { valid: false, error: 'Archive is missing required manifest.json.' }
     }
 
     if (!dbEntry) {
-      return { valid: false, error: 'Archive is missing required database file (campusdesk.db).' }
+      return { valid: false, error: 'Archive is missing required database file (campusdeck.db).' }
     }
 
     // Manifest validation
@@ -311,9 +311,9 @@ export function createBackupService(
     }
 
     // 2. Validate file integrity & checksums in staging
-    const stagedDb = join(stagingDir, 'campusdesk.db')
+    const stagedDb = join(stagingDir, 'campusdeck.db')
     if (!existsSync(stagedDb)) {
-      throw new Error('Extracted staging directory is missing campusdesk.db.')
+      throw new Error('Extracted staging directory is missing campusdeck.db.')
     }
 
     for (const fileEntry of manifest.files) {
@@ -340,13 +340,13 @@ export function createBackupService(
 
       // Step B: Copy active data into rollback directory
       if (existsSync(paths.dbPath)) {
-        copyFileSync(paths.dbPath, join(rollbackDir, 'campusdesk.db'))
+        copyFileSync(paths.dbPath, join(rollbackDir, 'campusdeck.db'))
       }
       if (existsSync(paths.dbPath + '-wal')) {
-        copyFileSync(paths.dbPath + '-wal', join(rollbackDir, 'campusdesk.db-wal'))
+        copyFileSync(paths.dbPath + '-wal', join(rollbackDir, 'campusdeck.db-wal'))
       }
       if (existsSync(paths.dbPath + '-shm')) {
-        copyFileSync(paths.dbPath + '-shm', join(rollbackDir, 'campusdesk.db-shm'))
+        copyFileSync(paths.dbPath + '-shm', join(rollbackDir, 'campusdeck.db-shm'))
       }
       if (existsSync(paths.libraryRoot)) {
         const rollbackLib = join(rollbackDir, 'library')
@@ -397,14 +397,14 @@ export function createBackupService(
         closeDatabase()
 
         // Roll back database files
-        if (existsSync(join(rollbackDir, 'campusdesk.db'))) {
-          copyFileSync(join(rollbackDir, 'campusdesk.db'), paths.dbPath)
+        if (existsSync(join(rollbackDir, 'campusdeck.db'))) {
+          copyFileSync(join(rollbackDir, 'campusdeck.db'), paths.dbPath)
         }
-        if (existsSync(join(rollbackDir, 'campusdesk.db-wal'))) {
-          copyFileSync(join(rollbackDir, 'campusdesk.db-wal'), paths.dbPath + '-wal')
+        if (existsSync(join(rollbackDir, 'campusdeck.db-wal'))) {
+          copyFileSync(join(rollbackDir, 'campusdeck.db-wal'), paths.dbPath + '-wal')
         }
-        if (existsSync(join(rollbackDir, 'campusdesk.db-shm'))) {
-          copyFileSync(join(rollbackDir, 'campusdesk.db-shm'), paths.dbPath + '-shm')
+        if (existsSync(join(rollbackDir, 'campusdeck.db-shm'))) {
+          copyFileSync(join(rollbackDir, 'campusdeck.db-shm'), paths.dbPath + '-shm')
         }
 
         // Roll back file library

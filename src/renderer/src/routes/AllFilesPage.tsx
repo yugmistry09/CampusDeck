@@ -87,7 +87,7 @@ export const AllFilesPage: React.FC = () => {
 
   const loadDocuments = useCallback(async () => {
     try {
-      const all = await window.campusDeskAPI.subjectDocs.listAll()
+      const all = await window.campusDeckAPI.subjectDocs.listAll()
       setDocuments(all)
     } catch (err) {
       console.error('Failed to load documents:', err)
@@ -105,7 +105,7 @@ export const AllFilesPage: React.FC = () => {
   const handleOpenDocument = async (doc: SubjectDocumentRecord) => {
     if (!doc.document_id) return
     try {
-      await window.campusDeskAPI.files.openDocument(doc.document_id)
+      await window.campusDeckAPI.files.openDocument(doc.document_id)
     } catch (err) {
       setNotification({
         type: 'error',
@@ -117,7 +117,7 @@ export const AllFilesPage: React.FC = () => {
   const handleDeleteDocument = async () => {
     if (!docToDelete) return
     try {
-      await window.campusDeskAPI.subjectDocs.delete(docToDelete.id)
+      await window.campusDeckAPI.subjectDocs.delete(docToDelete.id)
       setDocToDelete(null)
       loadDocuments()
       setNotification({ type: 'success', message: `Document "${docToDelete.title}" removed.` })

@@ -124,7 +124,7 @@ describe('Full Manual Backup, Safe Staging, & Atomic Restore', () => {
 
     // Verify ZIP contents directly
     const zip = new AdmZip(targetZip)
-    expect(zip.getEntry('campusdesk.db')).toBeDefined()
+    expect(zip.getEntry('campusdeck.db')).toBeDefined()
     expect(zip.getEntry('manifest.json')).toBeDefined()
     expect(zip.getEntry(`library/${attachedDoc!.relative_path}`)).toBeDefined()
 
@@ -179,7 +179,7 @@ describe('Full Manual Backup, Safe Staging, & Atomic Restore', () => {
     )
   })
 
-  it('rejects archives missing manifest.json or campusdesk.db', async () => {
+  it('rejects archives missing manifest.json or campusdeck.db', async () => {
     const invalidZipPath = join(testTempDir, 'missing_manifest.zip')
     const zip = new AdmZip()
     zip.addFile('dummy.txt', Buffer.from('hello'))
@@ -193,7 +193,7 @@ describe('Full Manual Backup, Safe Staging, & Atomic Restore', () => {
   it('strictly rejects archives with path traversal entries', async () => {
     const maliciousZipPath = join(testTempDir, 'malicious_traversal.zip')
     const zip = new AdmZip()
-    zip.addFile('campusdesk.db', Buffer.from('SQLite format 3\0'))
+    zip.addFile('campusdeck.db', Buffer.from('SQLite format 3\0'))
     zip.addFile(
       'manifest.json',
       Buffer.from(
@@ -202,7 +202,7 @@ describe('Full Manual Backup, Safe Staging, & Atomic Restore', () => {
           app_version: '0.1.0',
           created_at: new Date().toISOString(),
           schema_version: 3,
-          database_file: 'campusdesk.db',
+          database_file: 'campusdeck.db',
           files: []
         })
       )
@@ -223,7 +223,7 @@ describe('Full Manual Backup, Safe Staging, & Atomic Restore', () => {
   it('rejects archives with incompatible future schema versions', async () => {
     const futureSchemaZip = join(testTempDir, 'future_schema.zip')
     const zip = new AdmZip()
-    zip.addFile('campusdesk.db', Buffer.from('SQLite format 3\0'))
+    zip.addFile('campusdeck.db', Buffer.from('SQLite format 3\0'))
     zip.addFile(
       'manifest.json',
       Buffer.from(
@@ -232,7 +232,7 @@ describe('Full Manual Backup, Safe Staging, & Atomic Restore', () => {
           app_version: '2.0.0',
           created_at: new Date().toISOString(),
           schema_version: 999, // Future unsupported schema version
-          database_file: 'campusdesk.db',
+          database_file: 'campusdeck.db',
           files: []
         })
       )
@@ -247,7 +247,7 @@ describe('Full Manual Backup, Safe Staging, & Atomic Restore', () => {
   it('detects missing files or checksum mismatches declared in manifest', async () => {
     const tamperedZipPath = join(testTempDir, 'tampered.zip')
     const zip = new AdmZip()
-    zip.addFile('campusdesk.db', Buffer.from('SQLite format 3\0'))
+    zip.addFile('campusdeck.db', Buffer.from('SQLite format 3\0'))
     zip.addFile(
       'manifest.json',
       Buffer.from(
@@ -256,7 +256,7 @@ describe('Full Manual Backup, Safe Staging, & Atomic Restore', () => {
           app_version: '0.1.0',
           created_at: new Date().toISOString(),
           schema_version: 3,
-          database_file: 'campusdesk.db',
+          database_file: 'campusdeck.db',
           files: [
             {
               relative_path: 'doc1.pdf',

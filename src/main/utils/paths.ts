@@ -7,8 +7,8 @@ import { join } from 'path'
  * (relative to libraryRoot) to preserve machine portability (D-005).
  *
  * Dedicated directory layout:
- *   <userData>/campusdesk_storage/
- *     ├── campusdesk.db          (SQLite database)
+ *   <userData>/campusdeck_storage/
+ *     ├── campusdeck.db          (SQLite database)
  *     ├── library/               (app-managed files)
  *     └── backups/               (scheduled SQLite snapshots)
  */
@@ -31,11 +31,11 @@ export function getAppPaths(): {
   } catch {
     userData = process.env.TEST_USER_DATA_DIR || join(process.cwd(), 'scratch', 'test_userdata')
   }
-  const appDataDir = join(userData, 'campusdesk_storage')
+  const appDataDir = join(userData, 'campusdeck_storage')
   return {
     userData,
     appDataDir,
-    dbPath: join(appDataDir, 'campusdesk.db'),
+    dbPath: join(appDataDir, 'campusdeck.db'),
     libraryRoot: join(appDataDir, 'library'),
     backupsRoot: join(appDataDir, 'backups')
   }

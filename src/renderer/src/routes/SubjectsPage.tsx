@@ -26,7 +26,7 @@ export const SubjectsPage: React.FC = () => {
 
   const loadSubjects = useCallback(async () => {
     try {
-      const list = await window.campusDeskAPI.subjects.listWithStats()
+      const list = await window.campusDeckAPI.subjects.listWithStats()
       setSubjects(list)
     } catch (err) {
       console.error('Failed to load subjects:', err)
@@ -51,7 +51,7 @@ export const SubjectsPage: React.FC = () => {
   const handleDeleteSubject = async () => {
     if (!subjectToDelete) return
     try {
-      await window.campusDeskAPI.subjects.delete(subjectToDelete.id)
+      await window.campusDeckAPI.subjects.delete(subjectToDelete.id)
       setSubjectToDelete(null)
       loadSubjects()
       setNotification({ type: 'success', message: `Subject "${subjectToDelete.name}" deleted.` })
