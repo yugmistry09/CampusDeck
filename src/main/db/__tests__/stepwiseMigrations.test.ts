@@ -18,7 +18,7 @@ describe('Stepwise Database Migrations & Prior-Schema Compatibility', () => {
     db.close()
   })
 
-  it('progressively migrates from schema 001 to 002 to 003 without data loss', () => {
+  it('progressively migrates from schema 001 to 002 to 003 to 004 without data loss', () => {
     // 1. Apply Migration 001 only
     db.exec(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -101,14 +101,113 @@ describe('Stepwise Database Migrations & Prior-Schema Compatibility', () => {
     expect(viewRow.display_name).toBe('ProblemSet.pdf')
     expect(viewRow.role).toBe('assignment_file')
 
-    // 4. Now run migration runner again to verify idempotency
+    // 4. Apply Migration 004 (adds calendar events, task reminders, and work sessions)
+    const sql004 = readFileSync(
+      join(migrationsDir, '004_calendar_reminders_work_sessions.sql'),
+      'utf-8'
+    )
+    db.exec(sql004)
+    db.prepare('INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)').run(
+      '004_calendar_reminders_work_sessions',
+      new Date().toISOString()
+    )
+
+    // Verify the new scheduling tables exist
+    const newTables = (
+      db
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('calendar_events', 'task_reminders', 'work_sessions')"
+        )
+        .all() as { name: string }[]
+    ).map((t) => t.name)
+
+    expect(newTables).toContain('calendar_events')
+    expect(newTables).toContain('task_reminders')
+    expect(newTables).toContain('work_sessions')
+
+    // Verify task-linked records can be created
+    const calendarEventId = uuidv4()
+    db.prepare(`
+      INSERT INTO calendar_events (
+        id, task_id, title, description, start_at, end_at,
+        all_day, location, created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      calendarEventId,
+      taskId,
+      'Dynamic Programming Study Session',
+      'Review recurrence relations',
+      '2026-11-18T18:00:00.000Z',
+      '2026-11-18T19:00:00.000Z',
+      0,
+      'Library',
+      new Date().toISOString(),
+      new Date().toISOString()
+    )
+
+    const reminderId = uuidv4()
+    db.prepare(`
+      INSERT INTO task_reminders (
+        id, task_id, remind_at, dismissed_at, created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      reminderId,
+      taskId,
+      '2026-11-18T17:45:00.000Z',
+      null,
+      new Date().toISOString(),
+      new Date().toISOString()
+    )
+
+    const workSessionId = uuidv4()
+    db.prepare(`
+      INSERT INTO work_sessions (
+        id, task_id, title, note, start_at, end_at,
+        status, created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      workSessionId,
+      taskId,
+      'Dynamic Programming Study',
+      'Finish recurrence relations notes',
+      '2026-11-18T18:00:00.000Z',
+      '2026-11-18T19:00:00.000Z',
+      'planned',
+      new Date().toISOString(),
+      new Date().toISOString()
+    )
+
+    const eventRow = db.prepare(
+      'SELECT task_id, title, all_day FROM calendar_events WHERE id = ?'
+    ).get(calendarEventId) as any
+    expect(eventRow.task_id).toBe(taskId)
+    expect(eventRow.title).toBe('Dynamic Programming Study Session')
+    expect(eventRow.all_day).toBe(0)
+
+    const reminderRow = db.prepare(
+      'SELECT task_id, dismissed_at FROM task_reminders WHERE id = ?'
+    ).get(reminderId) as any
+    expect(reminderRow.task_id).toBe(taskId)
+    expect(reminderRow.dismissed_at).toBeNull()
+
+    const sessionRow = db.prepare(
+      'SELECT task_id, status FROM work_sessions WHERE id = ?'
+    ).get(workSessionId) as any
+    expect(sessionRow.task_id).toBe(taskId)
+    expect(sessionRow.status).toBe('planned')
+
+    // 5. Now run migration runner again to verify idempotency
     runMigrationsFromDir(db, migrationsDir)
 
     const migrations = db.prepare('SELECT version FROM schema_migrations ORDER BY version ASC').all() as any[]
     expect(migrations.map((m) => m.version)).toEqual([
       '001_initial',
       '002_subject_fields_and_categories',
-      '003_task_attachment_roles'
+      '003_task_attachment_roles',
+      '004_calendar_reminders_work_sessions'
     ])
   })
 
@@ -126,6 +225,9 @@ describe('Stepwise Database Migrations & Prior-Schema Compatibility', () => {
     expect(tables).toContain('task_documents')
     expect(tables).toContain('subject_documents')
     expect(tables).toContain('settings')
+    expect(tables).toContain('calendar_events')
+    expect(tables).toContain('task_reminders')
+    expect(tables).toContain('work_sessions')
 
     // Verify views
     const views = (

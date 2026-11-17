@@ -6,7 +6,10 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     include: ['src/**/__tests__/**/*.test.ts'],
-    isolate: true
+    isolate: true,
+    experimental: {
+      viteModuleRunner: false
+    }
   },
   resolve: {
     alias: {

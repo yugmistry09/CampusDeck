@@ -181,6 +181,109 @@ export const documentRefCountSchema = z.object({
   documentId: uuidSchema
 })
 
+
+// ---- Calendar Event schemas -------------------------------------------------
+
+const isoDateTimeSchema = z.string().datetime({ offset: true })
+
+export const calendarEventIdSchema = z.object({
+  id: uuidSchema
+})
+
+export const calendarEventTaskSchema = z.object({
+  taskId: uuidSchema
+})
+
+export const calendarEventBetweenSchema = z.object({
+  startAt: isoDateTimeSchema,
+  endAt: isoDateTimeSchema
+})
+
+export const calendarEventCreateSchema = z.object({
+  task_id: uuidSchema.nullable().optional(),
+  title: z.string().trim().min(1, 'title is required').max(500),
+  description: z.string().max(10000).optional(),
+  start_at: isoDateTimeSchema,
+  end_at: isoDateTimeSchema,
+  all_day: z.boolean().optional(),
+  location: z.string().max(500).optional()
+})
+
+export const calendarEventUpdateSchema = z.object({
+  id: uuidSchema,
+  task_id: uuidSchema.nullable().optional(),
+  title: z.string().trim().min(1).max(500).optional(),
+  description: z.string().max(10000).optional(),
+  start_at: isoDateTimeSchema.optional(),
+  end_at: isoDateTimeSchema.optional(),
+  all_day: z.boolean().optional(),
+  location: z.string().max(500).optional()
+})
+
+// ---- Task Reminder schemas --------------------------------------------------
+
+export const taskReminderIdSchema = z.object({
+  id: uuidSchema
+})
+
+export const taskReminderTaskSchema = z.object({
+  taskId: uuidSchema
+})
+
+export const taskReminderPendingSchema = z.object({
+  limit: z.number().int().min(1).max(500).optional()
+})
+
+export const taskReminderCreateSchema = z.object({
+  task_id: uuidSchema,
+  remind_at: isoDateTimeSchema
+})
+
+export const taskReminderUpdateSchema = z.object({
+  id: uuidSchema,
+  remind_at: isoDateTimeSchema.optional(),
+  dismissed_at: isoDateTimeSchema.nullable().optional()
+})
+
+// ---- Work Session schemas ---------------------------------------------------
+
+export const workSessionIdSchema = z.object({
+  id: uuidSchema
+})
+
+export const workSessionTaskSchema = z.object({
+  taskId: uuidSchema
+})
+
+export const workSessionBetweenSchema = z.object({
+  startAt: isoDateTimeSchema,
+  endAt: isoDateTimeSchema
+})
+
+export const workSessionStatusSchema = z.enum([
+  'planned',
+  'completed',
+  'cancelled'
+])
+
+export const workSessionCreateSchema = z.object({
+  task_id: uuidSchema,
+  title: z.string().trim().min(1, 'title is required').max(500),
+  note: z.string().max(10000).optional(),
+  start_at: isoDateTimeSchema,
+  end_at: isoDateTimeSchema,
+  status: workSessionStatusSchema.optional()
+})
+
+export const workSessionUpdateSchema = z.object({
+  id: uuidSchema,
+  title: z.string().trim().min(1).max(500).optional(),
+  note: z.string().max(10000).optional(),
+  start_at: isoDateTimeSchema.optional(),
+  end_at: isoDateTimeSchema.optional(),
+  status: workSessionStatusSchema.optional()
+})
+
 // ---- Settings schemas ------------------------------------------------------
 
 export const settingsUpdateSchema = z.object({

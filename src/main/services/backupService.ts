@@ -27,7 +27,7 @@ import type {
 } from '../../shared/types'
 
 // Current maximum schema version supported by migrations
-export const CURRENT_MAX_SCHEMA_VERSION = 3
+export const CURRENT_MAX_SCHEMA_VERSION = 4
 export const BACKUP_FORMAT_VERSION = 1
 
 /**

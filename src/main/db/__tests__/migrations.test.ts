@@ -19,16 +19,17 @@ describe('Database Migrations', () => {
   it('runs all versioned migrations and creates all required tables and views', () => {
     runMigrationsFromDir(db, migrationsDir)
 
-    // Verify schema_migrations table exists and has 001, 002, and 003
+    // Verify schema_migrations table exists and has 001 through 004
     const migrations = db
       .prepare('SELECT version FROM schema_migrations')
       .all() as { version: string }[]
-    expect(migrations.length).toBe(3)
+    expect(migrations.length).toBe(4)
     expect(migrations.some((m) => m.version === '001_initial')).toBe(true)
     expect(migrations.some((m) => m.version === '002_subject_fields_and_categories')).toBe(true)
     expect(migrations.some((m) => m.version === '003_task_attachment_roles')).toBe(true)
+    expect(migrations.some((m) => m.version === '004_calendar_reminders_work_sessions')).toBe(true)
 
-    // Verify all 6 required core tables exist
+    // Verify all required core tables exist
     const tables = (
       db
         .prepare(
@@ -44,6 +45,9 @@ describe('Database Migrations', () => {
     expect(tables).toContain('task_documents')
     expect(tables).toContain('subject_documents')
     expect(tables).toContain('settings')
+    expect(tables).toContain('calendar_events')
+    expect(tables).toContain('task_reminders')
+    expect(tables).toContain('work_sessions')
 
     // Verify views exist
     const views = (
@@ -77,6 +81,16 @@ describe('Database Migrations', () => {
     expect(indexes).toContain('idx_task_documents_task_id')
     expect(indexes).toContain('idx_task_documents_document_id')
     expect(indexes).toContain('idx_subject_docs_subject_id')
+    expect(indexes).toContain('idx_calendar_events_task_id')
+    expect(indexes).toContain('idx_calendar_events_start_at')
+    expect(indexes).toContain('idx_calendar_events_end_at')
+    expect(indexes).toContain('idx_task_reminders_task_id')
+    expect(indexes).toContain('idx_task_reminders_remind_at')
+    expect(indexes).toContain('idx_task_reminders_dismissed_at')
+    expect(indexes).toContain('idx_work_sessions_task_id')
+    expect(indexes).toContain('idx_work_sessions_start_at')
+    expect(indexes).toContain('idx_work_sessions_end_at')
+    expect(indexes).toContain('idx_work_sessions_status')
   })
 
   it('is idempotent when run multiple times', () => {
@@ -88,7 +102,7 @@ describe('Database Migrations', () => {
         count: number
       }
     ).count
-    expect(count).toBe(3)
+    expect(count).toBe(4)
   })
 
   it('seeds default settings on initial run', () => {

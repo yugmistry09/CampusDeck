@@ -24,7 +24,14 @@ import {
   taskDocUpdateSchema,
   settingsUpdateSchema,
   importSubjectDocSchema,
-  importTaskDocSchema
+  importTaskDocSchema,
+  calendarEventCreateSchema,
+  calendarEventUpdateSchema,
+  taskReminderCreateSchema,
+  taskReminderUpdateSchema,
+  workSessionCreateSchema,
+  workSessionUpdateSchema,
+  workSessionStatusSchema
 } from '../validation'
 
 describe('IPC Payload Validation & Schemas', () => {
@@ -209,6 +216,83 @@ describe('IPC Payload Validation & Schemas', () => {
         type: 'syllabus'
       })
       expect(importSubject.title).toBe('Syllabus 2026')
+    })
+  })
+
+  describe('Calendar Event Schemas', () => {
+    it('validates calendar event create input', () => {
+      const parsed = parseOrThrow(calendarEventCreateSchema, {
+        task_id: '123e4567-e89b-12d3-a456-426614174000',
+        title: 'Lecture',
+        start_at: '2026-12-01T10:00:00Z',
+        end_at: '2026-12-01T11:00:00Z',
+        all_day: false,
+        location: 'Room 101'
+      })
+
+      expect(parsed.title).toBe('Lecture')
+      expect(parsed.all_day).toBe(false)
+    })
+
+    it('validates calendar event update input', () => {
+      const parsed = parseOrThrow(calendarEventUpdateSchema, {
+        id: '123e4567-e89b-12d3-a456-426614174000',
+        title: 'Updated Lecture'
+      })
+
+      expect(parsed.title).toBe('Updated Lecture')
+    })
+
+    it('rejects invalid calendar timestamps', () => {
+      expect(() =>
+        parseOrThrow(calendarEventCreateSchema, {
+          title: 'Bad Event',
+          start_at: '2026-12-01',
+          end_at: '2026-12-01T11:00:00Z'
+        })
+      ).toThrow(/Validation error/)
+    })
+  })
+
+  describe('Task Reminder Schemas', () => {
+    it('validates reminder create and update inputs', () => {
+      const create = parseOrThrow(taskReminderCreateSchema, {
+        task_id: '123e4567-e89b-12d3-a456-426614174000',
+        remind_at: '2026-12-01T09:00:00Z'
+      })
+
+      const update = parseOrThrow(taskReminderUpdateSchema, {
+        id: '123e4567-e89b-12d3-a456-426614174000',
+        dismissed_at: null
+      })
+
+      expect(create.remind_at).toBe('2026-12-01T09:00:00Z')
+      expect(update.dismissed_at).toBeNull()
+    })
+  })
+
+  describe('Work Session Schemas', () => {
+    it('accepts all work session statuses', () => {
+      expect(parseOrThrow(workSessionStatusSchema, 'planned')).toBe('planned')
+      expect(parseOrThrow(workSessionStatusSchema, 'completed')).toBe('completed')
+      expect(parseOrThrow(workSessionStatusSchema, 'cancelled')).toBe('cancelled')
+    })
+
+    it('validates work session create and update inputs', () => {
+      const create = parseOrThrow(workSessionCreateSchema, {
+        task_id: '123e4567-e89b-12d3-a456-426614174000',
+        title: 'Study',
+        start_at: '2026-12-01T14:00:00Z',
+        end_at: '2026-12-01T15:00:00Z'
+      })
+
+      const update = parseOrThrow(workSessionUpdateSchema, {
+        id: '123e4567-e89b-12d3-a456-426614174000',
+        status: 'completed'
+      })
+
+      expect(create.title).toBe('Study')
+      expect(update.status).toBe('completed')
     })
   })
 

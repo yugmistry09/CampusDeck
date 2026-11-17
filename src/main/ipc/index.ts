@@ -6,6 +6,9 @@ import { createSettingsRepo, type SettingsRepo } from '../db/repositories/settin
 import { createSubjectDocRepo, type SubjectDocRepo } from '../db/repositories/subjectDocs'
 import { createDocumentRepo, type DocumentRepo } from '../db/repositories/documents'
 import { createTaskDocRepo, type TaskDocRepo } from '../db/repositories/taskDocs'
+import { createCalendarEventRepo, type CalendarEventRepo } from '../db/repositories/calendarEvents'
+import { createTaskReminderRepo, type TaskReminderRepo } from '../db/repositories/taskReminders'
+import { createWorkSessionRepo, type WorkSessionRepo } from '../db/repositories/workSessions'
 import { createFileLibraryService, type FileLibraryService } from '../services/fileLibrary'
 import { createBackupService } from '../services/backupService'
 import { registerSubjectHandlers } from './subjects'
@@ -15,6 +18,9 @@ import { registerSubjectDocHandlers } from './subjectDocs'
 import { registerTaskDocHandlers } from './taskDocs'
 import { registerFileHandlers } from './files'
 import { registerPdfHandlers } from './pdf'
+import { registerCalendarEventHandlers } from './calendarEvents'
+import { registerTaskReminderHandlers } from './taskReminders'
+import { registerWorkSessionHandlers } from './workSessions'
 
 // ---------------------------------------------------------------------------
 // IPC handler registration entry point
@@ -32,6 +38,9 @@ export function registerAllIpcHandlers(initialDb: Database): void {
   let currentSubjectDocRepo = createSubjectDocRepo(currentDb)
   let currentDocumentRepo = createDocumentRepo(currentDb)
   let currentTaskDocRepo = createTaskDocRepo(currentDb)
+  let currentCalendarEventRepo = createCalendarEventRepo(currentDb)
+  let currentTaskReminderRepo = createTaskReminderRepo(currentDb)
+  let currentWorkSessionRepo = createWorkSessionRepo(currentDb)
   let currentFileLibrary = createFileLibraryService(
     currentDocumentRepo,
     currentSubjectDocRepo,
@@ -46,6 +55,9 @@ export function registerAllIpcHandlers(initialDb: Database): void {
     currentSubjectDocRepo = createSubjectDocRepo(currentDb)
     currentDocumentRepo = createDocumentRepo(currentDb)
     currentTaskDocRepo = createTaskDocRepo(currentDb)
+    currentCalendarEventRepo = createCalendarEventRepo(currentDb)
+    currentTaskReminderRepo = createTaskReminderRepo(currentDb)
+    currentWorkSessionRepo = createWorkSessionRepo(currentDb)
     currentFileLibrary = createFileLibraryService(
       currentDocumentRepo,
       currentSubjectDocRepo,
@@ -72,6 +84,15 @@ export function registerAllIpcHandlers(initialDb: Database): void {
   const taskDocRepoProxy = new Proxy({} as TaskDocRepo, {
     get: (_, prop) => (currentTaskDocRepo as any)[prop]
   })
+  const calendarEventRepoProxy = new Proxy({} as CalendarEventRepo, {
+    get: (_, prop) => (currentCalendarEventRepo as any)[prop]
+  })
+  const taskReminderRepoProxy = new Proxy({} as TaskReminderRepo, {
+    get: (_, prop) => (currentTaskReminderRepo as any)[prop]
+  })
+  const workSessionRepoProxy = new Proxy({} as WorkSessionRepo, {
+    get: (_, prop) => (currentWorkSessionRepo as any)[prop]
+  })
   const fileLibraryProxy = new Proxy({} as FileLibraryService, {
     get: (_, prop) => (currentFileLibrary as any)[prop]
   })
@@ -90,4 +111,7 @@ export function registerAllIpcHandlers(initialDb: Database): void {
   registerTaskDocHandlers(taskDocRepoProxy, fileLibraryProxy)
   registerFileHandlers(fileLibraryProxy)
   registerPdfHandlers(documentRepoProxy, fileLibraryProxy)
+  registerCalendarEventHandlers(calendarEventRepoProxy)
+  registerTaskReminderHandlers(taskReminderRepoProxy)
+  registerWorkSessionHandlers(workSessionRepoProxy)
 }

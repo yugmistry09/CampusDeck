@@ -24,7 +24,16 @@ import type {
   PdfDocumentMetadata,
   StorageUsageInfo,
   BackupExportResult,
-  BackupRestoreResult
+  BackupRestoreResult,
+  CalendarEventRow,
+  CalendarEventCreateInput,
+  CalendarEventUpdateInput,
+  TaskReminderRow,
+  TaskReminderCreateInput,
+  TaskReminderUpdateInput,
+  WorkSessionRow,
+  WorkSessionCreateInput,
+  WorkSessionUpdateInput
 } from '../shared/types'
 
 // ---------------------------------------------------------------------------
@@ -70,6 +79,55 @@ const api = {
     overdue: () => invoke<TaskRow[]>('task:overdue'),
     dueSoon: (days?: number) => invoke<TaskWithSubject[]>('task:due-soon', { days }),
     dashboardStats: () => invoke<DashboardStats>('task:dashboard-stats')
+  },
+
+  calendarEvents: {
+    create: (input: CalendarEventCreateInput) =>
+      invoke<CalendarEventRow>('calendar-event:create', input),
+    get: (id: string) =>
+      invoke<CalendarEventRow | null>('calendar-event:get', { id }),
+    listAll: () =>
+      invoke<CalendarEventRow[]>('calendar-event:list-all'),
+    listByTask: (taskId: string) =>
+      invoke<CalendarEventRow[]>('calendar-event:list-by-task', { taskId }),
+    listBetween: (startAt: string, endAt: string) =>
+      invoke<CalendarEventRow[]>('calendar-event:list-between', { startAt, endAt }),
+    update: (input: CalendarEventUpdateInput) =>
+      invoke<CalendarEventRow | null>('calendar-event:update', input),
+    delete: (id: string) =>
+      invoke<void>('calendar-event:delete', { id })
+  },
+
+  taskReminders: {
+    create: (input: TaskReminderCreateInput) =>
+      invoke<TaskReminderRow>('task-reminder:create', input),
+    get: (id: string) =>
+      invoke<TaskReminderRow | null>('task-reminder:get', { id }),
+    listByTask: (taskId: string) =>
+      invoke<TaskReminderRow[]>('task-reminder:list-by-task', { taskId }),
+    listPending: (limit?: number) =>
+      invoke<TaskReminderRow[]>('task-reminder:list-pending', { limit }),
+    dismiss: (id: string) =>
+      invoke<TaskReminderRow | null>('task-reminder:dismiss', { id }),
+    update: (input: TaskReminderUpdateInput) =>
+      invoke<TaskReminderRow | null>('task-reminder:update', input),
+    delete: (id: string) =>
+      invoke<void>('task-reminder:delete', { id })
+  },
+
+  workSessions: {
+    create: (input: WorkSessionCreateInput) =>
+      invoke<WorkSessionRow>('work-session:create', input),
+    get: (id: string) =>
+      invoke<WorkSessionRow | null>('work-session:get', { id }),
+    listByTask: (taskId: string) =>
+      invoke<WorkSessionRow[]>('work-session:list-by-task', { taskId }),
+    listBetween: (startAt: string, endAt: string) =>
+      invoke<WorkSessionRow[]>('work-session:list-between', { startAt, endAt }),
+    update: (input: WorkSessionUpdateInput) =>
+      invoke<WorkSessionRow | null>('work-session:update', input),
+    delete: (id: string) =>
+      invoke<void>('work-session:delete', { id })
   },
 
   taskDocs: {

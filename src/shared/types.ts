@@ -60,6 +60,92 @@ export interface SubjectWithStats extends SubjectRow {
   totalFiles: number
 }
 
+export interface CalendarEventCreateInput {
+  task_id?: string | null
+  title: string
+  description?: string
+  start_at: string
+  end_at: string
+  all_day?: boolean
+  location?: string
+}
+
+export interface CalendarEventUpdateInput {
+  id: string
+  task_id?: string | null
+  title?: string
+  description?: string
+  start_at?: string
+  end_at?: string
+  all_day?: boolean
+  location?: string
+}
+
+export interface CalendarEventRow {
+  id: string
+  task_id: string | null
+  title: string
+  description: string
+  start_at: string
+  end_at: string
+  all_day: 0 | 1
+  location: string
+  created_at: string
+  updated_at: string
+}
+
+export interface TaskReminderCreateInput {
+  task_id: string
+  remind_at: string
+}
+
+export interface TaskReminderUpdateInput {
+  id: string
+  remind_at?: string
+  dismissed_at?: string | null
+}
+
+export interface TaskReminderRow {
+  id: string
+  task_id: string
+  remind_at: string
+  dismissed_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type WorkSessionStatus = 'planned' | 'completed' | 'cancelled'
+
+export interface WorkSessionCreateInput {
+  task_id: string
+  title: string
+  note?: string
+  start_at: string
+  end_at: string
+  status?: WorkSessionStatus
+}
+
+export interface WorkSessionUpdateInput {
+  id: string
+  title?: string
+  note?: string
+  start_at?: string
+  end_at?: string
+  status?: WorkSessionStatus
+}
+
+export interface WorkSessionRow {
+  id: string
+  task_id: string
+  title: string
+  note: string
+  start_at: string
+  end_at: string
+  status: WorkSessionStatus
+  created_at: string
+  updated_at: string
+}
+
 export interface TaskRow {
   id: string
   subject_id: string | null

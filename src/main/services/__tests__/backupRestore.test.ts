@@ -130,7 +130,7 @@ describe('Full Manual Backup, Safe Staging, & Atomic Restore', () => {
 
     const manifest = JSON.parse(zip.getEntry('manifest.json')!.getData().toString('utf-8'))
     expect(manifest.version).toBe(1)
-    expect(manifest.schema_version).toBe(3)
+    expect(manifest.schema_version).toBe(4)
     expect(manifest.files).toHaveLength(1)
     expect(manifest.files[0].relative_path).toBe(attachedDoc!.relative_path)
     expect(manifest.files[0].sha256).toBe(
@@ -146,7 +146,7 @@ describe('Full Manual Backup, Safe Staging, & Atomic Restore', () => {
     const restoreResult = await backupService.restoreBackup(targetZip)
     expect(restoreResult.success).toBe(true)
     expect(restoreResult.restoredFiles).toBe(1)
-    expect(restoreResult.schemaVersion).toBe(3)
+    expect(restoreResult.schemaVersion).toBe(4)
 
     // 5. Verify restored state
     const restoredSubjects = subjectRepo.list()
@@ -201,7 +201,7 @@ describe('Full Manual Backup, Safe Staging, & Atomic Restore', () => {
           version: 1,
           app_version: '0.1.0',
           created_at: new Date().toISOString(),
-          schema_version: 3,
+          schema_version: 4,
           database_file: 'campusdeck.db',
           files: []
         })
@@ -255,7 +255,7 @@ describe('Full Manual Backup, Safe Staging, & Atomic Restore', () => {
           version: 1,
           app_version: '0.1.0',
           created_at: new Date().toISOString(),
-          schema_version: 3,
+          schema_version: 4,
           database_file: 'campusdeck.db',
           files: [
             {
