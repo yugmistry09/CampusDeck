@@ -97,7 +97,7 @@ export function registerAllIpcHandlers(initialDb: Database): void {
     get: (_, prop) => (currentFileLibrary as any)[prop]
   })
 
-  let appVersion = '0.1.0'
+  let appVersion = '0.2.0'
   try {
     appVersion = app.getVersion()
   } catch {}

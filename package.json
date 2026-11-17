@@ -1,7 +1,7 @@
 {
   "name": "campusdeck",
   "productName": "CampusDeck",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Local-first academic task manager — Electron + React + TypeScript",
   "main": "./out/main/index.js",
   "author": "Yug Mistry <yug.mistry912@gmail.com>",

@@ -30,7 +30,7 @@ export function registerSettingsHandlers(
   ipcMain.handle('settings:get-paths', (event) => {
     assertTrustedSender(event.sender)
     const paths = getAppPaths()
-    let version = '0.1.0'
+    let version = '0.2.0'
     try {
       version = app.getVersion()
     } catch {}

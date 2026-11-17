@@ -478,7 +478,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           <span>Application Details & Privacy Guarantee</span>
         </div>
         <p className="leading-relaxed">
-          CampusDeck <strong className="text-slate-800 dark:text-slate-200">v{paths?.version || '0.1.0'}</strong> is strictly local-first.
+          CampusDeck <strong className="text-slate-800 dark:text-slate-200">v{paths?.version || '0.2.0'}</strong> is strictly local-first.
           Zero network requests or telemetry are transmitted (<code className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-[10px]">connect-src &apos;none&apos;</code>).
           All data operations, backups, and PDF parsing remain completely offline on your physical device.
         </p>

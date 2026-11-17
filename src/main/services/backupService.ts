@@ -37,7 +37,7 @@ export const BACKUP_FORMAT_VERSION = 1
  */
 export function createBackupService(
   getDb: () => Database.Database,
-  appVersion = '0.1.0',
+  appVersion = '0.2.0',
   onDatabaseReopened?: (newDb: Database.Database) => void
 ) {
   const paths = getAppPaths()
