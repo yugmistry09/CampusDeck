@@ -174,8 +174,7 @@ If Node.js is managed via `fnm`:
 
 ```bash
 export FNM_DIR=~/.local/share/fnm
-eval "$(~/.local/bin/fnm env --fnm-dir ~)"
-fnm use 22
+eval "$(~/.local/bin/fnm env --fnm-dir ~/.local/share/fnm)"
 ```
 
 ### Clone the Repository

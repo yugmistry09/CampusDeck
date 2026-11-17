@@ -156,6 +156,34 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
     loadAttachments()
   }, [loadTask, loadAttachments])
 
+  const filteredAttachments = useMemo(() => {
+    return attachments.filter((att) => {
+      if (attachmentFilter === 'all') return true
+      if (attachmentFilter === 'assignment') {
+        return att.role === 'assignment_file' || att.role === 'assignment'
+      }
+      if (attachmentFilter === 'solution') return att.role === 'solution'
+      if (attachmentFilter === 'reference') {
+        return att.role === 'reference' || att.role === 'other'
+      }
+      return true
+    })
+  }, [attachments, attachmentFilter])
+
+const counts = useMemo(() => {
+  let assignments = 0
+  let solutions = 0
+  let references = 0
+
+  for (const a of attachments) {
+    if (a.role === 'assignment_file' || a.role === 'assignment') assignments++
+    else if (a.role === 'solution') solutions++
+    else references++
+  }
+
+  return { all: attachments.length, assignments, solutions, references }
+}, [attachments])
+
   if (!task) {
     return (
       <div className="p-12 flex flex-col items-center justify-center text-center">
@@ -322,33 +350,6 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
       })
     }
   }
-
-  // Filter attachments
-  const filteredAttachments = useMemo(() => {
-    return attachments.filter((att) => {
-      if (attachmentFilter === 'all') return true
-      if (attachmentFilter === 'assignment') {
-        return att.role === 'assignment_file' || att.role === 'assignment'
-      }
-      if (attachmentFilter === 'solution') return att.role === 'solution'
-      if (attachmentFilter === 'reference') {
-        return att.role === 'reference' || att.role === 'other'
-      }
-      return true
-    })
-  }, [attachments, attachmentFilter])
-
-  const counts = useMemo(() => {
-    let assignments = 0
-    let solutions = 0
-    let references = 0
-    for (const a of attachments) {
-      if (a.role === 'assignment_file' || a.role === 'assignment') assignments++
-      else if (a.role === 'solution') solutions++
-      else references++
-    }
-    return { all: attachments.length, assignments, solutions, references }
-  }, [attachments])
 
   if (activePdfDoc && task) {
     const allPdfAttachments: PdfViewerAttachmentItem[] = attachments

@@ -1,3 +1,10 @@
+console.log(
+  '[Electron runtime]',
+  'Electron:', process.versions.electron,
+  'Node:', process.versions.node,
+  'ABI:', process.versions.modules
+)
+
 import { app, BrowserWindow, session } from 'electron'
 import { join } from 'path'
 import { mkdirSync } from 'fs'

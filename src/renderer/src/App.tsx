@@ -1,19 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import { Sidebar, NavTab } from './components/Sidebar'
-import { Header, ThemeMode } from './components/Header'
+import {  ThemeMode } from './components/Header'
 import { DashboardPage } from './routes/DashboardPage'
 import { TasksPage } from './routes/TasksPage'
 import { SubjectsPage } from './routes/SubjectsPage'
 import { AllFilesPage } from './routes/AllFilesPage'
 import { SettingsPage } from './routes/SettingsPage'
 
-const TAB_TITLES: Record<NavTab, { title: string; subtitle: string }> = {
-  dashboard: { title: 'Dashboard', subtitle: 'Academic progress and upcoming deadlines' },
-  tasks: { title: 'Unified Tasks', subtitle: 'Assignments, practicals, projects, and coursework' },
-  subjects: { title: 'Subjects & Modules', subtitle: 'Course documents, syllabuses, and materials' },
-  files: { title: 'File Library', subtitle: 'App-managed local documents and reference sheets' },
-  settings: { title: 'Settings', subtitle: 'Storage paths, preferences, and backups' }
-}
+
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard')
@@ -50,19 +44,12 @@ export const App: React.FC = () => {
     }
   }
 
-  const { title, subtitle } = TAB_TITLES[currentTab]
-
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
       <Sidebar currentTab={currentTab} onSelectTab={setCurrentTab} />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Header
-          title={title}
-          subtitle={subtitle}
-          theme={theme}
-          onThemeChange={handleThemeChange}
-        />
+        
 
         <main className="flex-1 overflow-y-auto p-6">
           {currentTab === 'dashboard' && (

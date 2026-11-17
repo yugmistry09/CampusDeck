@@ -32,12 +32,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
           <GraduationCap className="w-5 h-5" />
         </div>
         <div className="flex flex-col">
-          <span className="font-semibold text-sm tracking-tight text-slate-900 dark:text-slate-100">
+          <span className="font-semibold text-sm tracking-tight text-slate-900 dark:text-slate-100" style={{ fontSize: 19 }}>
             CampusDeck
           </span>
-          <span className="text-[10px] text-slate-500 dark:text-slate-400 -mt-0.5">
-            Local-First Academic Suite
-          </span>
+          
         </div>
       </div>
 
@@ -67,12 +65,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
       </nav>
 
       {/* Footer Info */}
-      <div className="p-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+      {/*<div className="p-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
         <span>Offline Vault</span>
         <span className="px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-400 font-mono text-[10px]">
           SQLite v1
         </span>
-      </div>
+      </div>*/}
     </aside>
   )
 }
