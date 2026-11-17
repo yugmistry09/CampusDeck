@@ -1,7 +1,7 @@
-# CampusDeck — Data Model (v0.2)
+# CampusDeck — Data Model (v0.2.0)
 
-> **Stage**: Prompt 2 — SQLite Persistence Layer Implemented.
-> **Date**: 2026-11-03
+> **Stage**: v0.2.0 Foundation — SQLite Persistence & Scheduling Foundation.
+> **Date**: 2026-11-17
 
 ---
 
@@ -9,9 +9,13 @@
 
 ```
 subjects (0..1) ────< tasks (1) ────< task_documents >──── (1) documents
-   │                                       │
-   │                                    role: 'assignment' | 'solution'
-   │                                    variant_label: optional
+   │                     │                 │
+   │                     │              role: 'assignment_file' | 'solution' | 'reference' | 'other' | 'assignment'
+   │                     │              variant_label: optional
+   │                     │
+   │                     ├───< calendar_events (0..*)      [task_id nullable, ON DELETE SET NULL]
+   │                     ├───< task_reminders (0..*)       [task_id required, ON DELETE CASCADE]
+   │                     └───< work_sessions (0..*)        [task_id required, ON DELETE CASCADE]
    │
    └────< subject_documents (0..*) >──── (0..1) documents
              (syllabuses, notices, etc.)
@@ -209,6 +213,94 @@ WHERE sd.document_id IS NOT NULL;
 
 ---
 
+### 2.8 `calendar_events` (Migration 004)
+
+Scheduled calendar events. Can exist independently or link to an academic task.
+
+```sql
+CREATE TABLE IF NOT EXISTS calendar_events (
+    id          TEXT PRIMARY KEY CHECK(length(id) = 36),  -- UUID v4
+    task_id     TEXT REFERENCES tasks(id) ON DELETE SET NULL,
+    title       TEXT NOT NULL CHECK(trim(title) != ''),
+    description TEXT NOT NULL DEFAULT '',
+    start_at    TEXT NOT NULL,                            -- ISO 8601 UTC
+    end_at      TEXT NOT NULL,                            -- ISO 8601 UTC
+    all_day     INTEGER NOT NULL DEFAULT 0 CHECK(all_day IN (0, 1)),
+    location    TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL,                            -- ISO 8601 UTC
+    updated_at  TEXT NOT NULL                             -- ISO 8601 UTC
+);
+
+CREATE INDEX IF NOT EXISTS idx_calendar_events_task_id
+    ON calendar_events(task_id);
+CREATE INDEX IF NOT EXISTS idx_calendar_events_start_at
+    ON calendar_events(start_at);
+CREATE INDEX IF NOT EXISTS idx_calendar_events_end_at
+    ON calendar_events(end_at);
+```
+
+**Delete behavior**: `task_id` is nullable. When a referenced task is deleted, `task_id` is set to NULL (`ON DELETE SET NULL`, D-015). The event remains preserved on the calendar.
+
+---
+
+### 2.9 `task_reminders` (Migration 004)
+
+Notifications or alerts attached to a task.
+
+```sql
+CREATE TABLE IF NOT EXISTS task_reminders (
+    id           TEXT PRIMARY KEY CHECK(length(id) = 36), -- UUID v4
+    task_id      TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    remind_at    TEXT NOT NULL,                           -- ISO 8601 UTC
+    dismissed_at TEXT,                                    -- ISO 8601 UTC when dismissed or NULL
+    created_at   TEXT NOT NULL,                           -- ISO 8601 UTC
+    updated_at   TEXT NOT NULL                            -- ISO 8601 UTC
+);
+
+CREATE INDEX IF NOT EXISTS idx_task_reminders_task_id
+    ON task_reminders(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_reminders_remind_at
+    ON task_reminders(remind_at);
+CREATE INDEX IF NOT EXISTS idx_task_reminders_dismissed_at
+    ON task_reminders(dismissed_at);
+```
+
+**Delete behavior**: Reminders belong strictly to a task. When the task is deleted, all its reminders are cascade-deleted (`ON DELETE CASCADE`, D-015).
+
+---
+
+### 2.10 `work_sessions` (Migration 004)
+
+Planned or recorded study / work blocks for a task.
+
+```sql
+CREATE TABLE IF NOT EXISTS work_sessions (
+    id         TEXT PRIMARY KEY CHECK(length(id) = 36),   -- UUID v4
+    task_id    TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    title      TEXT NOT NULL CHECK(trim(title) != ''),
+    note       TEXT NOT NULL DEFAULT '',
+    start_at   TEXT NOT NULL,                             -- ISO 8601 UTC
+    end_at     TEXT NOT NULL,                             -- ISO 8601 UTC
+    status     TEXT NOT NULL DEFAULT 'planned'
+               CHECK(status IN ('planned', 'completed', 'cancelled')),
+    created_at TEXT NOT NULL,                             -- ISO 8601 UTC
+    updated_at TEXT NOT NULL                              -- ISO 8601 UTC
+);
+
+CREATE INDEX IF NOT EXISTS idx_work_sessions_task_id
+    ON work_sessions(task_id);
+CREATE INDEX IF NOT EXISTS idx_work_sessions_start_at
+    ON work_sessions(start_at);
+CREATE INDEX IF NOT EXISTS idx_work_sessions_end_at
+    ON work_sessions(end_at);
+CREATE INDEX IF NOT EXISTS idx_work_sessions_status
+    ON work_sessions(status);
+```
+
+**Delete behavior**: Work sessions belong strictly to a task. When the task is deleted, its work sessions cascade-delete (`ON DELETE CASCADE`, D-015).
+
+---
+
 ## 3. Relationship & Delete Behavior Summary
 
 | Parent table | Child table | ON DELETE | Notes |
@@ -216,6 +308,9 @@ WHERE sd.document_id IS NOT NULL;
 | `subjects` | `tasks` | SET NULL | Preserves tasks as unassigned when course is deleted |
 | `subjects` | `subject_documents` | CASCADE | Subject reference documents are deleted with the course |
 | `tasks` | `task_documents` | CASCADE | Document attachments removed from task; documents table preserved |
+| `tasks` | `calendar_events` | SET NULL | Preserves calendar occurrence when academic task is deleted (D-015) |
+| `tasks` | `task_reminders` | CASCADE | Task-specific reminders deleted when task is deleted (D-015) |
+| `tasks` | `work_sessions` | CASCADE | Task-specific work sessions deleted when task is deleted (D-015) |
 | `documents` | `task_documents` | CASCADE | Removing document removes task linkage |
 | `documents` | `subject_documents` | CASCADE | Removing document clears subject linkage |
 

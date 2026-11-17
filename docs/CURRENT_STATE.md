@@ -5,7 +5,7 @@
 
 ---
 
-## Snapshot Date: 2026-11-12
+## Snapshot Date: 2026-11-17 (v0.2.0 Foundation Phase)
 
 ---
 
@@ -13,15 +13,17 @@
 
 | Component | State | Details |
 |---|---|---|
-| Repository & Environment | ✅ Complete | Node v22.23.4 (via fnm), npm v10.9.9, Git repository initialized on `main` branch |
-| Desktop Runtime | ✅ Complete | Electron v33.2.0, electron-vite v2.3.0, TypeScript v5.6.3 (strict mode) |
+| Repository & Environment | ✅ Complete | Node v22.23.4 (via fnm), npm v10.9.9, Git repository on dedicated `v2` development branch |
+| Desktop Runtime | ✅ Complete | Electron v33.4.11, electron-vite v2.3.0, TypeScript v5.6.3 (strict mode) |
 | UI Framework & Styling | ✅ Complete | React 18, Tailwind CSS 3.4 (dark mode `class` strategy), Lucide Icons, responsive shell |
 | Security Boundary | ✅ Complete | `nodeIntegration: false`, `contextIsolation: true`, `sandbox: true`, restrictive CSP with `worker-src 'self' blob:` and `connect-src 'none'`, `assertTrustedSender` window verification |
-| Preload API | ✅ Complete | Narrow, typed `contextBridge` exposing `window.campusDeckAPI` (including `pdf.getBytes` and `pdf.getMetadata`) |
+| Preload API | ✅ Complete | Narrow, typed `contextBridge` exposing `window.campusDeckAPI` (including `calendarEvents`, `taskReminders`, `workSessions`, `taskDocs`, `pdf`, `backup`) |
 | Storage Location | ✅ Complete | Dedicated directory beneath `userData`: `<userData>/campusdeck_storage/` (db, library, backups) |
-| Database Engine | ✅ Complete | SQLite via `better-sqlite3` in WAL mode, `foreign_keys = ON`, `synchronous = NORMAL` |
-| Migrations | ✅ Complete | 3 versioned migrations (`001_initial.sql`, `002_subject_fields_and_categories.sql`, `003_task_attachment_roles.sql`) with `schema_migrations` tracking |
-| Relational Schema | ✅ Complete | `subjects`, `tasks`, `documents`, `task_documents`, `subject_documents`, `settings` (key-value) |
+| Database Engine | ✅ Complete | SQLite via `better-sqlite3` (11.10.0) in WAL mode, `foreign_keys = ON`, `synchronous = NORMAL` |
+| Migrations | ✅ Complete | 4 versioned migrations (`001_initial.sql`, `002_subject_fields_and_categories.sql`, `003_task_attachment_roles.sql`, `004_calendar_reminders_work_sessions.sql`) with `schema_migrations` tracking & embedded fallback |
+| Relational Schema | ✅ Complete | `subjects`, `tasks`, `documents`, `task_documents`, `subject_documents`, `settings`, `calendar_events`, `task_reminders`, `work_sessions`, views (`task_files`, `subject_document_files`) |
+| Scheduling Repositories | ✅ Complete | `calendarEvents`, `taskReminders`, `workSessions` repositories with CRUD, interval overlap `listBetween`, and pending reminder queries |
+| Scheduling IPC & Validation | ✅ Complete | 20 scheduling IPC channels with Zod payload validation, UUID & ISO-8601 offset parsing, and `assertTrustedSender` |
 | Subject Management | ✅ Complete | Full CRUD with validation, code, semester, color picker, notes, stats, and delete confirmation |
 | Subject Drill-down View | ✅ Complete | Detail view with Overview, Files tab with category filtering, and integrated Tasks tab with attachment previews |
 | Task Model & CRUD | ✅ Complete | Single source of truth across all 7 types (`general`, `assignment`, `lab_manual`, `practical`, `project`, `exam_prep`, `other`), 3 statuses (`todo`, `in_progress`, `completed`), 3 priorities (`low`, `medium`, `high`), due date (`YYYY-MM-DD`), and archive state |
@@ -38,50 +40,50 @@
 | Secure PDF Access IPC | ✅ Complete | Main-process IPC `pdf:get-document-bytes` & `pdf:get-document-metadata` streaming vault bytes by document ID; strict validation, path traversal guard, and MIME verification |
 | Settings & Theme Switcher | ✅ Complete | Light, Dark, and System theme preferences with instant UI application and persistent storage in SQLite `settings` table |
 | Storage Usage & Data Folder | ✅ Complete | Real-time disk utilization metrics (database size, file vault size, total files, total storage) and native "Open Data Folder" action via `shell.openPath` |
-| Manual Backup Export (.zip) | ✅ Complete | Consistent SQLite snapshot via native `db.backup()`, managed files bundle, and `manifest.json` with SHA-256 checksums and schema version |
-| Safe Atomic Restore & Rollback | ✅ Complete | Staged extraction, path traversal rejection, checksum validation, database closure, rollback snapshots, atomic swap, and dynamic IPC proxy rebinding |
+| Manual Backup Export (.zip) | ✅ Complete | Consistent SQLite snapshot via native `db.backup()`, managed files bundle, and `manifest.json` with SHA-256 checksums and schema version 4 |
+| Safe Atomic Restore & Rollback | ✅ Complete | Staged extraction, path traversal rejection, checksum validation, database closure, rollback snapshots, atomic swap, and dynamic IPC proxy rebinding across all 9 repositories |
 | Non-PDF Default Application Action | ✅ Complete | Clearly labelled "Open with default app" action for non-PDF attachments and subject documents |
 | Subject Task Attachment Display | ✅ Complete | Attachment badges on task cards in subject task lists without duplicating task records |
 | Document Import Flow | ✅ Complete | Native main-process dialog (with multi-select support), format & metadata validation, UUID-safe storage, transactional linking |
 | Document Opening | ✅ Complete | Secure `shell.openPath` via verified document ID only (never raw path from renderer) |
 | Non-Task Files Library | ✅ Complete | Subject Files tab and global All Files page with category tags, search, and delete |
-| Deletion Safeguards | ✅ Complete | Subject deletion sets `tasks.subject_id = NULL` (preserves tasks per D-006) and safely cleans unreferenced files |
-| Automated Tests | ✅ Complete | Vitest unit, service, IPC validation, stepwise migration, and domain calculation test suites (14 test suites, 103 tests passing) |
+| Deletion Safeguards | ✅ Complete | Subject deletion sets `tasks.subject_id = NULL` (preserves tasks per D-006) and safely cleans unreferenced files; task deletion cascades reminders/sessions and preserves calendar events per D-015 |
+| Automated Tests | ✅ Complete | Vitest unit, repository, service, IPC validation, stepwise migration, and domain calculation test suites (18 test suites, 138 tests passing, 100% green) |
 | Release Hardening & Packaging | ✅ Complete | Window open denial, navigation block, embedded SQL migration fallback, ESLint flat config, Linux AppImage & .deb packages |
 
 ---
 
-## Exact Test Results (Release-Hardening Verification)
+## Exact Test Results (v0.2.0 Foundation Verification)
 
 Command run:
 ```bash
-npm run lint
 npm run typecheck
 npm test
-npm run build
-npm run package
 ```
 
 Vitest output:
 ```
- ✓ src/main/db/__tests__/tasks.test.ts (12)
- ✓ src/main/db/__tests__/domainCalculations.test.ts (11)
- ✓ src/main/ipc/__tests__/validation.test.ts (19)
- ✓ src/main/ipc/__tests__/pdfAccess.test.ts (8)
+ ✓ src/main/db/__tests__/calendarEvents.test.ts (7)
  ✓ src/main/db/__tests__/documents.test.ts (6)
- ✓ src/main/db/__tests__/subjects.test.ts (7)
- ✓ src/main/db/__tests__/stepwiseMigrations.test.ts (2)
- ✓ src/main/services/__tests__/fileLibrary.test.ts (6)
- ✓ src/main/db/__tests__/subjectDocs.test.ts (4)
- ✓ src/main/db/__tests__/taskDocs.test.ts (8)
- ✓ src/main/services/__tests__/backupRestore.test.ts (7)
- ✓ src/main/services/__tests__/fileLibraryErrors.test.ts (5)
+ ✓ src/main/db/__tests__/domainCalculations.test.ts (11)
  ✓ src/main/db/__tests__/migrations.test.ts (4)
  ✓ src/main/db/__tests__/settings.test.ts (4)
+ ✓ src/main/db/__tests__/stepwiseMigrations.test.ts (2)
+ ✓ src/main/db/__tests__/subjectDocs.test.ts (4)
+ ✓ src/main/db/__tests__/subjects.test.ts (7)
+ ✓ src/main/db/__tests__/taskDocs.test.ts (8)
+ ✓ src/main/db/__tests__/taskReminders.test.ts (7)
+ ✓ src/main/db/__tests__/tasks.test.ts (12)
+ ✓ src/main/db/__tests__/workSessions.test.ts (6)
+ ✓ src/main/ipc/__tests__/calendarRemindersSessions.test.ts (9)
+ ✓ src/main/ipc/__tests__/pdfAccess.test.ts (8)
+ ✓ src/main/ipc/__tests__/validation.test.ts (25)
+ ✓ src/main/services/__tests__/backupRestore.test.ts (7)
+ ✓ src/main/services/__tests__/fileLibrary.test.ts (6)
+ ✓ src/main/services/__tests__/fileLibraryErrors.test.ts (5)
 
- Test Files  14 passed (14)
-      Tests  103 passed (103)
-   Duration  6.87s
+ Test Files  18 passed (18)
+      Tests  138 passed (138)
 ```
 
 Production Build output:
@@ -312,13 +314,40 @@ Result: Clean production bundle created for main process (`out/main/index.js`), 
 
 ---
 
-## Next Stage: Feature Extensions / Cross-Platform Builds
+## v0.2.0 Foundation Phase (Complete)
 
-**Status**: Release hardening complete. 103 tests passing, linting clean, types valid, production Linux packages generated.
+### Database & Migrations
+- `src/main/db/migrations/004_calendar_reminders_work_sessions.sql`: Added tables and indexes for `calendar_events`, `task_reminders`, and `work_sessions`.
+- `src/main/db/connection.ts`: Registered migration 004 in embedded migration fallback and disk migration probe.
+- `src/main/db/__tests__/migrations.test.ts` & `src/main/db/__tests__/stepwiseMigrations.test.ts`: Verified 4-step progressive migration and idempotency without data loss.
 
-**Future Items**:
-1. Optional macOS / Windows build and signing pipelines (CI/CD).
-2. Advanced full-text search indexing across document contents (FTS5).
-3. Additional task tagging and custom color coding.
+### Repositories
+- `src/main/db/repositories/calendarEvents.ts`: Created repository with `create`, `getById`, `listAll`, `listByTask`, `listBetween` (interval overlap), `update`, `delete`.
+- `src/main/db/repositories/taskReminders.ts`: Created repository with `create`, `getById`, `listByTask`, `listPending` (limit filter), `dismiss`, `update`, `delete`.
+- `src/main/db/repositories/workSessions.ts`: Created repository with `create`, `getById`, `listByTask`, `listBetween` (interval overlap), `update`, `delete`.
+
+### IPC Layer & Preload Surface
+- `src/main/ipc/calendarEvents.ts`: 7 handlers for calendar event CRUD, range lookup, and task association.
+- `src/main/ipc/taskReminders.ts`: 7 handlers for reminder creation, pending notifications, dismissals, and updates.
+- `src/main/ipc/workSessions.ts`: 6 handlers for planned/recorded study sessions.
+- `src/main/ipc/validation.ts`: Zod schemas for all scheduling inputs, ISO-8601 offset strings, status enums, and UUIDs.
+- `src/main/ipc/index.ts`: Rebound repository proxies so dynamic SQLite reconnection (e.g. on backup restore) seamlessly routes to reopened instances.
+- `src/preload/index.ts`: Exposed typed `campusDeckAPI.calendarEvents`, `taskReminders`, and `workSessions`.
+- `src/shared/types.ts`: Added canonical interfaces for scheduling models, inputs, and statuses.
+
+### Backup Service
+- `src/main/services/backupService.ts`: Updated `CURRENT_MAX_SCHEMA_VERSION = 4` to recognize migration 004 archives.
+
+---
+
+## Next Stage: Phase 2 — File System & Document Workflow
+
+**Status**: v0.2.0 Foundation Complete. 138 tests passing across 18 test files, typechecking clean.
+
+**Upcoming in Phase 2**:
+1. Drag and drop file upload support.
+2. Direct document attachment during task creation flow.
+3. Enhanced external file export/sharing actions.
+
 
 

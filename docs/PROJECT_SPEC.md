@@ -107,12 +107,17 @@ subject_completion  = completed_non_archived_tasks_for_subject / all_non_archive
 
 ### 4.6 Backup Strategy
 
-- An automatic SQLite backup copy is written to `<userData>/backups/` on each app launch
-  and on a configurable schedule (default: daily).
-- Backup filenames include an ISO 8601 timestamp: `campusdeck_backup_2026-10-29T18-00-00.db`.
-- The managed library files are **not** automatically backed up in V1 (this is documented
-  as a known limitation and future feature).
-- Restore is manual: user replaces `campusdeck.db` with a backup copy.
+- Full manual backup export via native SQLite `.backup()` creates a transactionally consistent snapshot of `campusdeck.db`.
+- Managed library files are archived with SHA-256 checksums and a versioned `manifest.json`.
+- Restore uses staged extraction, checksum verification, rollback snapshot creation, and atomic swap.
+
+### 4.7 Scheduling Architecture (v0.2.0)
+
+A tripartite scheduling system separates task deadlines from calendar scheduling, reminders, and work sessions:
+
+1. **Calendar Events (`calendar_events`)**: Scheduled occurrences on a calendar (lectures, labs, tests, study sessions). May optionally link to a task (`task_id` nullable, `ON DELETE SET NULL`).
+2. **Task Reminders (`task_reminders`)**: Specific alert timestamps for a task (`remind_at`). Must link to a task (`task_id` required, `ON DELETE CASCADE`).
+3. **Work Sessions (`work_sessions`)**: Planned or logged focus blocks (`start_at` to `end_at`) dedicated to a task, with status `planned`, `completed`, or `cancelled`. Must link to a task (`task_id` required, `ON DELETE CASCADE`).
 
 ---
 
@@ -150,6 +155,12 @@ subject_completion  = completed_non_archived_tasks_for_subject / all_non_archive
 - [ ] User can change theme (light/dark/system).
 - [ ] User can view the current library path (read-only display in V1).
 - [ ] Backup schedule is configurable (daily, weekly, on-launch-only).
+
+### AC-7: Scheduling Foundation (v0.2.0)
+- [ ] Calendar events support CRUD, overlap range queries (`listBetween`), and survive task deletion (`ON DELETE SET NULL`).
+- [ ] Task reminders support CRUD, pending notifications queries (`listPending`), dismissal, and cascade on task deletion (`ON DELETE CASCADE`).
+- [ ] Work sessions support CRUD, status transitions (`planned`, `completed`, `cancelled`), overlap queries, and cascade on task deletion (`ON DELETE CASCADE`).
+- [ ] IPC layer strictly validates all UUIDs, ISO datetimes, and schemas, enforcing `assertTrustedSender`.
 
 ---
 

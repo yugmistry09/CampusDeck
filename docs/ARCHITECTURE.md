@@ -1,7 +1,7 @@
-# CampusDeck — Architecture Document (v0.1)
+# CampusDeck — Architecture Document (v0.2.0)
 
-> **Stage**: Prompt 1 — Design only. No product code exists.
-> **Date**: 2026-10-29
+> **Stage**: v0.2.0 Foundation — Multi-process isolation, relational persistence, and scheduling foundations.
+> **Date**: 2026-11-17
 
 ---
 
@@ -14,24 +14,25 @@ Electron runs three distinct JavaScript contexts. CampusDeck keeps them strictly
 │  Renderer Process (Chromium, sandboxed)                         │
 │  React + TypeScript UI                                          │
 │  nodeIntegration: false  │  contextIsolation: true             │
-│  No direct Node or FS access                                    │
+│  No direct Node or SQLite access                                │
 │                          │                                      │
 │          window.campusDeckAPI  (exposed by preload)             │
 └─────────────────────────┬───────────────────────────────────────┘
                           │ contextBridge + typed IPC channels
 ┌─────────────────────────▼───────────────────────────────────────┐
 │  Preload Script (Node context, sandboxed)                       │
-│  Bridges renderer ↔ main via ipcRenderer.invoke / on           │
-│  Exposes ONLY the named API surface — nothing else              │
+│  Bridges renderer ↔ main via ipcRenderer.invoke                │
+│  Exposes ONLY the typed API surface — nothing else              │
 └─────────────────────────┬───────────────────────────────────────┘
-                          │ ipcMain.handle (async, named channels)
+                          │ ipcMain.handle (async, validated channels)
 ┌─────────────────────────▼───────────────────────────────────────┐
 │  Main Process (Node.js, full OS access)                         │
 │  App lifecycle, BrowserWindow management                        │
-│  SQLite queries via better-sqlite3                              │
-│  File system operations (copy, delete, read)                    │
-│  PDF.js viewer window management                                │
-│  Backup scheduler                                               │
+│  SQLite queries via better-sqlite3 (WAL mode)                   │
+│  Repositories (subjects, tasks, documents, scheduling)          │
+│  Services (fileLibrary, backupService)                          │
+│  PDF streaming bytes & metadata via IPC                         │
+│  Zod runtime payload validation & assertTrustedSender           │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -43,58 +44,62 @@ Electron runs three distinct JavaScript contexts. CampusDeck keeps them strictly
 CampusDeck/
 ├── src/
 │   ├── main/
-│   │   ├── index.ts            ← App entry; creates BrowserWindow
+│   │   ├── index.ts            ← App entry; BrowserWindow creation & security
 │   │   ├── ipc/
 │   │   │   ├── tasks.ts        ← IPC handlers for task CRUD
 │   │   │   ├── subjects.ts     ← IPC handlers for subject CRUD
-│   │   │   ├── files.ts        ← IPC handlers for file import/delete/open
-│   │   │   ├── settings.ts     ← IPC handlers for settings get/set
-│   │   │   └── index.ts        ← Registers all handlers
+│   │   │   ├── taskDocs.ts     ← IPC handlers for task document linking/unlinking
+│   │   │   ├── subjectDocs.ts  ← IPC handlers for subject document CRUD
+│   │   │   ├── files.ts        ← IPC handlers for file import/open/delete
+│   │   │   ├── pdf.ts          ← IPC handlers for streaming PDF bytes & metadata
+│   │   │   ├── calendarEvents.ts← IPC handlers for calendar event scheduling
+│   │   │   ├── taskReminders.ts← IPC handlers for task notifications/reminders
+│   │   │   ├── workSessions.ts ← IPC handlers for planned/recorded work blocks
+│   │   │   ├── settings.ts     ← IPC handlers for storage metrics & backup
+│   │   │   ├── validation.ts   ← Zod schemas & assertTrustedSender
+│   │   │   └── index.ts        ← Registers all handlers with repo proxies
 │   │   ├── db/
-│   │   │   ├── connection.ts   ← Opens / migrates the SQLite database
-│   │   │   ├── migrations/     ← Numbered SQL migration files
-│   │   │   │   └── 001_initial.sql
-│   │   │   ├── queries/
-│   │   │   │   ├── tasks.ts
-│   │   │   │   ├── subjects.ts
-│   │   │   │   ├── files.ts
-│   │   │   │   └── settings.ts
-│   │   │   └── schema.ts       ← TypeScript types mirroring DB schema
+│   │   │   ├── connection.ts   ← SQLite initialization, WAL mode & migrations
+│   │   │   ├── migrations/     ← Numbered SQL migrations (001 to 004)
+│   │   │   │   ├── 001_initial.sql
+│   │   │   │   ├── 002_subject_fields_and_categories.sql
+│   │   │   │   ├── 003_task_attachment_roles.sql
+│   │   │   │   └── 004_calendar_reminders_work_sessions.sql
+│   │   │   └── repositories/   ← Relational data access repositories
+│   │   │       ├── subjects.ts
+│   │   │       ├── tasks.ts
+│   │   │       ├── documents.ts
+│   │   │       ├── taskDocs.ts
+│   │   │       ├── subjectDocs.ts
+│   │   │       ├── calendarEvents.ts
+│   │   │       ├── taskReminders.ts
+│   │   │       ├── workSessions.ts
+│   │   │       └── settings.ts
 │   │   ├── services/
-│   │   │   ├── fileLibrary.ts  ← Copy-in, unique-name, delete from library
-│   │   │   ├── backup.ts       ← Scheduled SQLite backup
-│   │   │   └── pdfViewer.ts    ← Open PDF.js window for a given file path
+│   │   │   ├── fileLibrary.ts  ← Safe copy-in, unique UUID names, ref-counting
+│   │   │   └── backupService.ts← Native db.backup(), safe staging & atomic swap
 │   │   └── utils/
 │   │       └── paths.ts        ← Resolves userData, library, backup paths
 │   │
 │   ├── preload/
-│   │   └── index.ts            ← contextBridge.exposeInMainWorld('campusDeckAPI', …)
+│   │   └── index.ts            ← contextBridge exposing window.campusDeckAPI
+│   │
+│   ├── shared/
+│   │   └── types.ts            ← Canonical TypeScript interfaces shared across layers
 │   │
 │   └── renderer/
 │       ├── index.html          ← Shell HTML
-│       ├── main.tsx            ← React root; router setup
-│       ├── routes/
-│       │   ├── Dashboard.tsx
-│       │   ├── Tasks.tsx
-│       │   ├── Subjects.tsx
-│       │   ├── SubjectDetail.tsx
-│       │   ├── AllFiles.tsx
-│       │   └── Settings.tsx
-│       ├── components/         ← Shared UI components
-│       ├── hooks/              ← Custom React hooks (useTaskList, etc.)
-│       ├── store/              ← Local state (Zustand or React Context)
-│       └── types/              ← TypeScript types for the IPC API contract
+│       ├── src/
+│       │   ├── main.tsx        ← React root
+│       │   ├── App.tsx         ← App layout, routing & global state
+│       │   ├── routes/         ← Pages (Dashboard, Tasks, Subjects, etc.)
+│       │   ├── components/     ← UI components (Modals, TaskCard, PdfViewer)
+│       │   ├── services/       ← Renderer services (pdfService)
+│       │   └── types/          ← Global window typings
 │
-├── resources/
-│   ├── pdfjs/                  ← Bundled PDF.js viewer (web build)
-│   └── icons/                  ← App icons (png, icns, ico)
-│
-├── docs/                       ← All planning docs (this file, etc.)
-├── scripts/                    ← Dev helper scripts
-├── vite.config.ts
-├── tsconfig.json
-├── tsconfig.node.json
-├── electron-builder.yml
+├── docs/                       ← Architecture, specifications & test plans
+├── vitest.config.ts            ← Vitest configuration (Node environment)
+├── electron.vite.config.ts     ← electron-vite multi-process bundle config
 └── package.json
 ```
 
@@ -102,56 +107,108 @@ CampusDeck/
 
 ## 3. IPC Contract (Channel Naming Convention)
 
-All channels follow `domain:action` naming. The preload exposes them as typed
-async functions. The main process registers handlers in `src/main/ipc/`.
+All channels follow `domain:action` naming. Handlers validate runtime payloads with Zod and check caller sender authenticity.
 
 ### 3.1 Task Channels
 
 | Channel | Direction | Payload | Returns |
 |---|---|---|---|
-| `task:list` | renderer→main | `{ subjectId?: string, includeArchived?: boolean }` | `Task[]` |
-| `task:get` | renderer→main | `{ id: string }` | `Task \| null` |
-| `task:create` | renderer→main | `TaskCreateInput` | `Task` |
-| `task:update` | renderer→main | `TaskUpdateInput` | `Task` |
-| `task:archive` | renderer→main | `{ id: string, archived: boolean }` | `Task` |
+| `task:list` | renderer→main | `{ subject_id?: string, type?: TaskType, status?: TaskStatus, is_archived?: boolean, search?: string }` | `TaskRow[]` |
+| `task:get` | renderer→main | `{ id: string }` | `TaskRow \| null` |
+| `task:get-with-subject` | renderer→main | `{ id: string }` | `TaskWithSubject \| null` |
+| `task:create` | renderer→main | `TaskCreateInput` | `TaskRow` |
+| `task:update` | renderer→main | `TaskUpdateInput` | `TaskRow \| null` |
+| `task:archive` | renderer→main | `{ id: string, archived: boolean }` | `TaskRow \| null` |
 | `task:delete` | renderer→main | `{ id: string }` | `void` |
-| `task:completion` | renderer→main | `{ subjectId?: string }` | `CompletionResult` |
+| `task:completion` | renderer→main | `{ subject_id?: string }` | `CompletionResult` |
+| `task:overdue` | renderer→main | `{}` | `TaskRow[]` |
+| `task:due-soon` | renderer→main | `{ withinDays?: number }` | `TaskRow[]` |
+| `task:dashboard-stats` | renderer→main | `{}` | `DashboardStats` |
 
 ### 3.2 Subject Channels
 
 | Channel | Direction | Payload | Returns |
 |---|---|---|---|
-| `subject:list` | renderer→main | `{}` | `Subject[]` |
-| `subject:get` | renderer→main | `{ id: string }` | `Subject \| null` |
-| `subject:create` | renderer→main | `SubjectCreateInput` | `Subject` |
-| `subject:update` | renderer→main | `SubjectUpdateInput` | `Subject` |
+| `subject:list` | renderer→main | `{}` | `SubjectWithStats[]` |
+| `subject:get` | renderer→main | `{ id: string }` | `SubjectWithStats \| null` |
+| `subject:create` | renderer→main | `SubjectCreateInput` | `SubjectRow` |
+| `subject:update` | renderer→main | `SubjectUpdateInput` | `SubjectRow \| null` |
 | `subject:delete` | renderer→main | `{ id: string }` | `void` |
 
-### 3.3 File Channels
+### 3.3 Calendar Event Channels (v0.2.0)
 
 | Channel | Direction | Payload | Returns |
 |---|---|---|---|
-| `file:import` | renderer→main | `{ sourcePath: string, role: FileRole, taskId?: string, subjectDocId?: string, displayName: string, variantLabel?: string }` | `FileRecord` |
-| `file:delete` | renderer→main | `{ id: string }` | `void` |
-| `file:open` | renderer→main | `{ id: string }` | `void` (opens viewer window) |
-| `file:list` | renderer→main | `{ taskId?: string, subjectDocId?: string }` | `FileRecord[]` |
-| `file:list-all` | renderer→main | `{}` | `FileRecord[]` |
+| `calendar-event:create` | renderer→main | `CalendarEventCreateInput` | `CalendarEventRow` |
+| `calendar-event:get` | renderer→main | `{ id: string }` | `CalendarEventRow \| null` |
+| `calendar-event:list-all` | renderer→main | `{}` | `CalendarEventRow[]` |
+| `calendar-event:list-by-task` | renderer→main | `{ taskId: string }` | `CalendarEventRow[]` |
+| `calendar-event:list-between` | renderer→main | `{ startAt: string, endAt: string }` | `CalendarEventRow[]` |
+| `calendar-event:update` | renderer→main | `CalendarEventUpdateInput` | `CalendarEventRow \| null` |
+| `calendar-event:delete` | renderer→main | `{ id: string }` | `void` |
 
-### 3.4 Subject Document Channels
+### 3.4 Task Reminder Channels (v0.2.0)
 
 | Channel | Direction | Payload | Returns |
 |---|---|---|---|
-| `subject-doc:list` | renderer→main | `{ subjectId: string }` | `SubjectDocument[]` |
-| `subject-doc:create` | renderer→main | `SubjectDocumentCreateInput` | `SubjectDocument` |
+| `task-reminder:create` | renderer→main | `TaskReminderCreateInput` | `TaskReminderRow` |
+| `task-reminder:get` | renderer→main | `{ id: string }` | `TaskReminderRow \| null` |
+| `task-reminder:list-by-task` | renderer→main | `{ taskId: string }` | `TaskReminderRow[]` |
+| `task-reminder:list-pending` | renderer→main | `{ limit?: number }` | `TaskReminderRow[]` |
+| `task-reminder:dismiss` | renderer→main | `{ id: string }` | `TaskReminderRow \| null` |
+| `task-reminder:update` | renderer→main | `TaskReminderUpdateInput` | `TaskReminderRow \| null` |
+| `task-reminder:delete` | renderer→main | `{ id: string }` | `void` |
+
+### 3.5 Work Session Channels (v0.2.0)
+
+| Channel | Direction | Payload | Returns |
+|---|---|---|---|
+| `work-session:create` | renderer→main | `WorkSessionCreateInput` | `WorkSessionRow` |
+| `work-session:get` | renderer→main | `{ id: string }` | `WorkSessionRow \| null` |
+| `work-session:list-by-task` | renderer→main | `{ taskId: string }` | `WorkSessionRow[]` |
+| `work-session:list-between` | renderer→main | `{ startAt: string, endAt: string }` | `WorkSessionRow[]` |
+| `work-session:update` | renderer→main | `WorkSessionUpdateInput` | `WorkSessionRow \| null` |
+| `work-session:delete` | renderer→main | `{ id: string }` | `void` |
+
+### 3.6 Task Document Channels
+
+| Channel | Direction | Payload | Returns |
+|---|---|---|---|
+| `task-doc:list` | renderer→main | `{ taskId: string }` | `TaskDocumentRecord[]` |
+| `task-doc:list-by-subject` | renderer→main | `{ subjectId: string }` | `TaskDocumentRecord[]` |
+| `task-doc:list-all` | renderer→main | `{}` | `TaskDocumentRecord[]` |
+| `task-doc:select-and-import` | renderer→main | `ImportTaskDocInput` | `TaskDocumentRecord[]` |
+| `task-doc:update` | renderer→main | `TaskDocumentUpdateInput` | `TaskDocumentRecord` |
+| `task-doc:unlink` | renderer→main | `{ id: string }` | `void` |
+| `task-doc:delete` | renderer→main | `{ id: string }` | `TaskDocumentDeleteResult` |
+| `task-doc:ref-count` | renderer→main | `{ documentId: string }` | `DocumentRefCount` |
+
+### 3.7 Subject Document Channels
+
+| Channel | Direction | Payload | Returns |
+|---|---|---|---|
+| `subject-doc:list` | renderer→main | `{ subjectId: string }` | `SubjectDocumentRecord[]` |
+| `subject-doc:list-all` | renderer→main | `{}` | `SubjectDocumentRecord[]` |
+| `subject-doc:select-and-import` | renderer→main | `ImportSubjectDocInput` | `SubjectDocumentRecord[]` |
 | `subject-doc:delete` | renderer→main | `{ id: string }` | `void` |
 
-### 3.5 Settings Channels
+### 3.8 PDF Streaming Channels
 
 | Channel | Direction | Payload | Returns |
 |---|---|---|---|
-| `settings:get` | renderer→main | `{}` | `AppSettings` |
-| `settings:set` | renderer→main | `Partial<AppSettings>` | `AppSettings` |
-| `settings:get-paths` | renderer→main | `{}` | `{ userData: string, library: string, backups: string }` |
+| `pdf:get-document-bytes` | renderer→main | `{ documentId: string }` | `Uint8Array` |
+| `pdf:get-document-metadata` | renderer→main | `{ documentId: string }` | `PdfDocumentMetadata` |
+
+### 3.9 Settings & Backup Channels
+
+| Channel | Direction | Payload | Returns |
+|---|---|---|---|
+| `settings:get` | renderer→main | `{}` | `Record<string, string>` |
+| `settings:set` | renderer→main | `Record<string, string>` | `Record<string, string>` |
+| `settings:get-storage-usage`| renderer→main | `{}` | `StorageUsageInfo` |
+| `settings:open-data-folder` | renderer→main | `{}` | `void` |
+| `backup:export` | renderer→main | `{}` | `BackupExportResult` |
+| `backup:restore` | renderer→main | `{}` | `BackupRestoreResult` |
 
 ---
 
@@ -159,20 +216,25 @@ async functions. The main process registers handlers in `src/main/ipc/`.
 
 ### 4.1 contextBridge API Surface
 
-The preload script exposes **one** object on `window`:
+The preload script exposes typed domain namespaces on `window.campusDeckAPI`:
 
 ```typescript
 window.campusDeckAPI = {
-  tasks: { list, get, create, update, archive, delete, completion },
   subjects: { list, get, create, update, delete },
-  files: { import, delete, open, list, listAll },
-  subjectDocs: { list, create, delete },
-  settings: { get, set, getPaths },
+  tasks: { list, get, getWithSubject, create, update, archive, delete, completion, overdue, dueSoon, dashboardStats },
+  calendarEvents: { create, get, listAll, listByTask, listBetween, update, delete },
+  taskReminders: { create, get, listByTask, listPending, dismiss, update, delete },
+  workSessions: { create, get, listByTask, listBetween, update, delete },
+  taskDocs: { list, listBySubject, listAll, selectAndImport, update, unlink, delete, getRefCount },
+  subjectDocs: { list, listAll, selectAndImport, delete },
+  files: { open, delete },
+  pdf: { getBytes, getMetadata },
+  settings: { get, set, getStorageUsage, openDataFolder },
+  backup: { export, restore }
 }
 ```
 
-No other Node.js API is exposed. The renderer has no way to access `require`,
-`fs`, `path`, `child_process`, or any Electron internal.
+No raw Electron or Node.js APIs (`ipcRenderer`, `require`, `fs`) are accessible to the renderer.
 
 ### 4.2 BrowserWindow Configuration
 
@@ -183,80 +245,82 @@ new BrowserWindow({
     nodeIntegration: false,
     contextIsolation: true,
     sandbox: true,
-    webSecurity: true,
+    webSecurity: true
   }
 })
 ```
 
-### 4.3 PDF Viewer Window
+### 4.3 In-App PDF Viewer Security
 
-The PDF.js viewer opens in a **separate** `BrowserWindow` with:
-- `nodeIntegration: false`
-- `contextIsolation: true`
-- `sandbox: true`
-- The file is loaded by the main process reading the file bytes and passing them
-  via a local protocol handler (registered with `protocol.registerBufferProtocol`)
-  rather than by exposing the raw filesystem path to the renderer.
+The PDF viewer is rendered directly in the React renderer via `pdfjs-dist` with:
+- Locally bundled Web Worker (`pdf.worker.min.mjs`, zero CDN / network access).
+- CSP enforcing `worker-src 'self' blob:` and `connect-src 'none'`.
+- Document bytes streamed from the main process via IPC channel `pdf:get-document-bytes`.
+- The renderer never receives raw or absolute filesystem paths.
 
 ---
 
-## 5. Data Flow — Adding a Task File
+## 5. Data Flow — Attaching a Task Document
 
 ```
-User picks a file in renderer
+User selects file(s) via native dialog in renderer
         ↓
-renderer calls window.campusDeckAPI.files.import(sourcePath, role, taskId, displayName)
+renderer calls window.campusDeckAPI.taskDocs.selectAndImport({ taskId, role, variantLabel })
         ↓
-IPC channel: "file:import"
+IPC channel: "task-doc:select-and-import"
         ↓
-main/ipc/files.ts handler
+main/ipc/taskDocs.ts handler
         ↓
 main/services/fileLibrary.ts
-  • Generates UUID for internal filename
-  • Copies source → <userData>/library/<uuid>.<ext>
+  • Opens native dialog with supported extensions
+  • Validates file MIME and format
+  • Copies source → <userData>/campusdeck_storage/library/<uuid>.<ext>
   • Computes relative path: "library/<uuid>.<ext>"
         ↓
-main/db/queries/files.ts
-  • INSERT INTO files (relative_path, display_name, role, task_id, ...)
+main/db/repositories/documents.ts & taskDocs.ts
+  • INSERT INTO documents (id, display_name, relative_path, mime_type, size_bytes)
+  • INSERT INTO task_documents (id, task_id, document_id, role, variant_label)
         ↓
-Returns FileRecord to renderer
+Returns TaskDocumentRecord[] to renderer
 ```
 
 ---
 
 ## 6. Backup Architecture
 
-```
-App launch  ──→  backup.ts
-                   • Opens <userData>/campusdeck.db
-                   • sqlite3 backup API → <userData>/backups/<timestamp>.db
-                   • Prunes backups older than configurable retention window
-                   • Default: keep last 30 daily backups
-```
-
-No network is used. Restore is manual (documented in Settings view).
+Full manual backup export and atomic restore via `backupService.ts`:
+- **Export**: Uses SQLite's native `.backup()` API to snapshot the active database without stopping writes. Gathers all files in `library/`, computes SHA-256 checksums, generates `manifest.json`, and packages into a ZIP archive.
+- **Restore Pipeline**: 
+  1. Validates ZIP integrity and path traversal absence.
+  2. Verifies manifest schema compatibility (`CURRENT_MAX_SCHEMA_VERSION = 4`).
+  3. Stages extraction to temporary directory and validates SHA-256 hashes.
+  4. Takes a pre-restore rollback snapshot of active database and library.
+  5. Performs atomic swap and re-opens SQLite database.
+  6. Rebinds ES6 dynamic proxy delegates so active IPC handlers seamlessly use the restored database.
 
 ---
 
-## 7. PDF.js Integration
+## 7. PDF.js Offline Integration
 
-- PDF.js is downloaded and bundled in `resources/pdfjs/` during setup (before first build).
-- The viewer HTML (`resources/pdfjs/web/viewer.html`) is served via a custom local
-  `campusdeck://` protocol registered in the main process.
-- The file bytes are read by the main process (has FS access) and streamed to the
-  protocol response. The renderer and viewer never see the absolute path of the file.
+- `pdfjs-dist` is installed as a production dependency.
+- The PDF worker is configured via Vite bundled asset:
+  ```typescript
+  import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
+  ```
+- All rendering uses HTML5 Canvas with DPR scaling and render-task cancellation to prevent race conditions during rapid page switching.
+- 100% offline; zero external network calls.
 
 ---
 
 ## 8. Build and Package
 
-```
-npm run dev        → electron-vite dev server + hot reload
-npm run build      → Vite production build for all three processes
-npm run package    → electron-builder packages into .deb / .AppImage (Linux)
+```bash
+npm run dev        # electron-vite dev server + hot reload
+npm run build      # Vite production build & migration copy
+npm run package    # electron-builder packages into .deb / .AppImage (Linux)
 ```
 
-- `electron-builder.yml` specifies `linux.targets: [deb, AppImage]`.
-- `asar: true` bundles source into an Electron archive.
-- `extraResources` copies `resources/pdfjs/` into the packaged app.
-- `node_modules` is pruned to production-only dependencies before packaging.
+- `electron-builder.yml` specifies Linux AppImage and deb targets.
+- Embedded SQL migrations provide an automated fallback if migration files are isolated from binary bundles.
+

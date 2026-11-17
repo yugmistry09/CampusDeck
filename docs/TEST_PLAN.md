@@ -1,7 +1,7 @@
-# CampusDeck — Test Plan (v1.0 — Release Hardening Complete)
+# CampusDeck — Test Plan (v0.2.0 — Foundation Phase)
 
-> **Stage**: Release Hardening & Verification — 14 Test Suites, 103 Tests Passing (100% Green)
-> **Date**: 2026-11-12
+> **Stage**: v0.2.0 Foundation — 18 Test Suites, 138 Tests Passing (100% Green)
+> **Date**: 2026-11-17
 
 ---
 
@@ -11,7 +11,7 @@ CampusDeck uses a three-tier test approach:
 
 | Tier | Tool | What it covers | When run |
 |---|---|---|---|
-| **Unit** | Vitest | Pure functions, DB queries, file service logic | On every file save (watch mode) / CI |
+| **Unit** | Vitest | Pure functions, repository CRUD, file service logic | On every file save (watch mode) / CI |
 | **Integration** | Vitest + in-memory SQLite | IPC handler → DB layer end-to-end | Pre-commit / CI |
 | **E2E** | Playwright + `@playwright/test` + Electron driver | Full UI flows in the running app | Pre-release / CI |
 
@@ -22,11 +22,11 @@ CampusDeck uses a three-tier test approach:
 ```
 src/
 ├── main/
-│   ├── db/queries/__tests__/        ← Unit: SQL query functions
-│   ├── services/__tests__/          ← Unit: fileLibrary, backup, pdfViewer
-│   └── ipc/__tests__/              ← Integration: IPC handlers with real DB
+│   ├── db/__tests__/               ← Unit & integration: Repositories & migrations
+│   ├── services/__tests__/         ← Unit: fileLibrary, backupService, errors
+│   └── ipc/__tests__/             ← Integration: IPC handlers with real DB & validation
 └── renderer/
-    └── components/__tests__/        ← Unit: React components (Vitest + jsdom)
+    └── components/__tests__/       ← Unit: React components (Vitest + jsdom)
 
 tests/
 └── e2e/                            ← E2E: Playwright scenarios
@@ -104,7 +104,7 @@ Tests mock the filesystem using a temp directory (no real `userData`).
 
 | Test | Assertion |
 |---|---|
-| Progressive migration 001 → 002 → 003 | Migrates schema stepwise, preserves all data across steps, updates `schema_migrations` table |
+| Progressive migration 001 → 002 → 003 → 004 | Migrates schema stepwise, preserves all data across steps, updates `schema_migrations` table |
 | Embedded migration fallback | Executes embedded SQL strings when disk migration directory is missing/inaccessible |
 
 ### 3.6 File Library Error Handling & Security Invariants (`fileLibraryErrors.test.ts`)
@@ -116,6 +116,41 @@ Tests mock the filesystem using a temp directory (no real `userData`).
 | Path traversal protection | Strips directory traversal sequences (`../../`) and prevents writing outside library root |
 | Unlink document safety | Unlinking task document does not delete disk file when referenced by other tasks/subjects |
 | Concurrent file imports | Safely imports multiple files concurrently without race conditions or filename collisions |
+
+### 3.7 Calendar Events Repository (`calendarEvents.test.ts`)
+
+| Test | Assertion |
+|---|---|
+| Create and getById | Inserts event with 36-char UUID, matches start_at/end_at/all_day/location |
+| List all events | Returns events sorted in ascending `start_at, created_at` order |
+| List by task | Returns only events linked to specified `task_id` |
+| List between range | Interval overlap query (`start_at < endAt AND end_at > startAt`) |
+| Update event | Updates fields (title, location, all_day) and refreshes `updated_at` |
+| Delete event | Deletes event and returns boolean; subsequent getById returns null |
+| Task deletion cascade | Sets `task_id = NULL` on linked event when parent task is deleted |
+
+### 3.8 Task Reminders Repository (`taskReminders.test.ts`)
+
+| Test | Assertion |
+|---|---|
+| Create and getById | Creates reminder with `dismissed_at = NULL` and verified ISO datetime |
+| List by task | Returns reminders sorted by `remind_at ASC` |
+| List pending | Returns only undismissed reminders where `remind_at <= now` up to limit |
+| Dismiss reminder | Sets `dismissed_at` timestamp and removes from pending list |
+| Update reminder | Updates `remind_at` or resets `dismissed_at` |
+| Delete reminder | Removes row and returns boolean result |
+| Task deletion cascade | Cascade deletes reminder when parent task is deleted |
+
+### 3.9 Work Sessions Repository (`workSessions.test.ts`)
+
+| Test | Assertion |
+|---|---|
+| Create and getById | Creates session with default status `'planned'` and valid UUID |
+| List by task | Returns sessions for task ordered by `start_at ASC` |
+| List between range | Interval overlap query for scheduled focus blocks |
+| Update session | Updates note, title, and status (`planned` → `completed` → `cancelled`) |
+| Delete session | Deletes session from SQLite |
+| Task deletion cascade | Cascade deletes work sessions when parent task is deleted |
 
 ---
 
@@ -141,11 +176,26 @@ file system chain.
 |---|---|
 | UUID format validation | Validates canonical v4 UUIDs, rejects invalid or malformed strings |
 | Date format validation | Validates `YYYY-MM-DD` ISO calendar dates, rejects invalid dates and times |
+| Datetime offset validation | Validates full ISO-8601 strings with timezone offset |
+| Calendar event schemas | Enforces non-empty title, ISO datetime start/end, optional task_id |
+| Task reminder schemas | Enforces required task_id, remind_at datetime, optional dismissal |
+| Work session schemas | Enforces status enum (`planned`, `completed`, `cancelled`), valid start/end |
 | Hex color validation | Validates `#RRGGBB` format, rejects invalid hex formats |
 | Subject payload validation | Requires valid name, clamps semester range (1-12), trims strings |
 | Task payload validation | Requires subject for assignment-like types, enforces status and priority enums |
 | Settings payload validation | Enforces theme enums (`light`, `dark`, `system`), rejects unauthorized keys |
 | `assertTrustedSender` | Verifies IPC `sender` belongs to a registered `BrowserWindow` WebContents |
+
+### 4.3 Scheduling IPC Integration (`calendarRemindersSessions.test.ts`)
+
+| Test | Assertion |
+|---|---|
+| Calendar event lifecycle | Creates, retrieves, updates, lists all, lists by task, and deletes via IPC |
+| Calendar range query | Filters events overlapping startAt/endAt window via IPC |
+| Task reminder lifecycle | Creates, retrieves, lists by task, lists pending, dismisses, updates, and deletes via IPC |
+| Work session lifecycle | Creates, retrieves, updates status, lists by task, filters between, and deletes via IPC |
+| Validation rejection | Rejects invalid UUIDs or datetimes across scheduling channels |
+| Sender security | Rejects unowned or untrusted sender WebContents across scheduling channels |
 
 ---
 
@@ -341,6 +391,7 @@ Scenario: Restore from backup with confirmation warning
 | AC-4: PDF Viewing | E2E 6.4 |
 | AC-5: Due Date Evaluation | Unit §3.1 overdue tests; E2E 6.6 |
 | AC-6: Settings | Integration §4 last 2 rows; E2E (settings view — Prompt 3+) |
+| AC-7: Scheduling Foundation | Unit §3.7, §3.8, §3.9; Integration §4.3 |
 
 ---
 
@@ -362,10 +413,10 @@ These checks are verified for every release:
 ```bash
 # Code Quality & Static Analysis
 npm run lint               # eslint --max-warnings 0
-npm run typecheck          # tsc --noEmit
+npm run typecheck          # tsc --noEmit (Node main/preload & web renderer)
 
 # Unit & Integration Test Suites
-npm test                   # vitest run (14 suites, 103 tests)
+npm test                   # vitest run (18 suites, 138 tests)
 
 # Production Packaging (Linux x86_64)
 npm run build              # electron-vite build & copy migrations

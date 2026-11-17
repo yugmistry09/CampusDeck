@@ -12,16 +12,19 @@ CampusDeck is **local-first and offline by design**. No account, server, cloud s
 
 - Subject-wise organization of academic work and documents
 - Central task/to-do list with due dates and completion status
-- Assignments, lab manuals, practicals, and general tasks
+- Assignments, lab manuals, practicals, projects, and general tasks
 - Assignment documents linked directly to their corresponding tasks
-- Multiple solution/reference files per assignment
+- Multiple solution/reference files per assignment with editable variant labels
 - Subject miscellaneous files such as syllabi, notices, marks, and other documents
+- Calendar events and scheduling foundation with interval overlap queries
+- Task-specific reminder scheduling, pending alerts queries, and dismissal tracking
+- Work session planning, status tracking (`planned`, `completed`, `cancelled`), and time blocks
 - Overall task completion/progress tracking
-- App-managed local document library
-- Manual full backup and restore
-- Versioned database migrations
+- App-managed local document library with reference counting and shared file protection
+- In-app PDF viewer powered by offline locally bundled PDF.js worker
+- Manual full backup export (.zip) and safe atomic restore with rollback protection
+- Versioned SQLite database migrations (001–004) with embedded fallback
 - Offline operation with no cloud dependency
-- Safe restore with validation, checksum verification, and rollback protection
 
 ---
 

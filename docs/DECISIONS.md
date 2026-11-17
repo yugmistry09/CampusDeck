@@ -193,7 +193,38 @@ requires only `curl`, and supports `.node-version` for project-pinned versions.
 - `nvm`: Also user-local; valid alternative. `fnm` is faster and Rust-based.
 - Dev Container (Docker): Docker not present; would require additional install.
 
-**Status**: PENDING USER APPROVAL (see SETUP_PLAN.md).
+---
+
+## D-014 | 2026-11-17 | STABLE
+**Decision**: Use a tripartite scheduling model (`calendar_events`, `task_reminders`, `work_sessions`) separate from `tasks.due_date`.
+
+**Rationale**: A task due date is an academic deadline milestone (`YYYY-MM-DD`). A calendar event represents a scheduled occurrence on a calendar (such as a lecture, exam, or deadline reminder, with optional task association). A task reminder represents an alert trigger timestamp (`remind_at`). A work session represents a focused block of time spent working on a task (`start_at` to `end_at`). Conflating these into the `tasks` table would limit each task to a single scheduled block or reminder, violate normalization, and prevent independent calendar entries that do not represent coursework tasks.
+
+**Alternatives considered**:
+- Store scheduling arrays or JSON columns in `tasks`: Violates relational normalization and impairs index performance.
+- Use a single generic "events" table for everything: Conflates fundamentally different lifecycle rules (reminders need dismissal, sessions need status, calendar events can exist without a task).
+
+---
+
+## D-015 | 2026-11-17 | STABLE
+**Decision**: Calendar events survive task deletion (`ON DELETE SET NULL`), while task reminders and work sessions cascade-delete (`ON DELETE CASCADE`).
+
+**Rationale**: Calendar events represent real-world scheduled occurrences or calendar blocks that the user may want to retain on their schedule even if an academic task item is removed. Conversely, a task reminder or work session has no semantic meaning without its parent task; leaving them orphaned would pollute notification and session lists.
+
+**Alternatives considered**:
+- CASCADE delete calendar events: Destructive; removes calendar records unexpectedly.
+- Prevent task deletion if calendar events or sessions exist: User-hostile.
+
+---
+
+## D-016 | 2026-11-17 | STABLE
+**Decision**: Maintain dual native module ABI targets for `better-sqlite3` (Node ABI 127 for Vitest, Electron ABI 130 for packaged app/dev).
+
+**Rationale**: Electron 33 uses Node ABI 130 whereas the host Node.js LTS (v22.23.4) uses Node ABI 127. Vitest executes in a pure Node environment for fast, isolated test execution, which requires `better-sqlite3` compiled for ABI 127. Electron packaging uses `npm run rebuild-electron` (`electron-rebuild -f -w better-sqlite3`) to compile for ABI 130. Distinguishing these runtime ABIs prevents destabilizing application architecture to bypass native module constraints.
+
+**Alternatives considered**:
+- Run all tests inside Electron runner: Drastically slows down test execution; complicates CI.
+- Switch to pure JavaScript SQLite (e.g. sql.js / wasm): Significant performance regression and lack of native `.backup()` API.
 
 ---
 
@@ -213,3 +244,6 @@ significant portions of the app or documentation:
 | D-009 YYYY-MM-DD + localtime | Due date display and overdue detection everywhere |
 | D-010 No fake login | User-trust promise; must not be reversed without real encryption |
 | D-012 contextBridge IPC | Security model; determines what renderer can ever access |
+| D-014 Tripartite scheduling | Distinguishes task due date, calendar occurrences, reminders, and work blocks |
+| D-015 Scheduling deletion semantics | Preserves calendar events on task deletion while cascading reminders/sessions |
+| D-016 Dual ABI strategy | Keeps Vitest tests fast in Node ABI 127 and Electron runtime stable in ABI 130 |
