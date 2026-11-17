@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "description": "Local-first academic task manager — Electron + React + TypeScript",
   "main": "./out/main/index.js",
-  "author": "CampusDeck Contributors <dev@campusdeck.local>",
-  "homepage": "https://github.com/campusdeck/campusdeck",
+  "author": "Yug Mistry <yug.mistry912@gmail.com>",
+  "homepage": "https://github.com/yugmistry09/campusdeck",
   "license": "MIT",
   "private": true,
   "scripts": {
