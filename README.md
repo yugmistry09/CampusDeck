@@ -195,27 +195,33 @@ npm install
 
 This installs project dependencies into the local `node_modules/` directory.
 
-### Development Server
+### Development Server (Electron Runtime)
+
+`better-sqlite3` is a native C++ module that must be compiled for Electron ABI 130 before running the desktop app:
 
 ```bash
+npm run rebuild-electron
 npm run dev
 ```
 
-Starts the Electron development environment using Vite.
+Starts the Electron development environment using Vite and loads the native database binding.
+
+### Automated Tests (Node.js Runtime)
+
+Vitest executes under host Node.js (ABI 127). Before running tests, ensure `better-sqlite3` is built for Node:
+
+```bash
+npm run rebuild-node
+npm test
+```
+
+Runs the project's automated unit, repository, migration, and IPC validation tests.
 
 ### Type Checking
 
 ```bash
 npm run typecheck
 ```
-
-### Automated Tests
-
-```bash
-npm test
-```
-
-Runs the project's automated repository and migration tests.
 
 ### Production Build
 
@@ -224,6 +230,8 @@ npm run build
 ```
 
 Creates the production application build.
+
+> **Tip:** See [`docs/NATIVE_MODULES.md`](docs/NATIVE_MODULES.md) for complete details on the dual Node ABI 127 / Electron ABI 130 architecture and troubleshooting `NODE_MODULE_VERSION` mismatches.
 
 ---
 
@@ -494,6 +502,7 @@ Detailed architectural and project documentation is available in `docs/`:
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) — Architectural decision records and stable invariants
 - [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) — Current implementation state and stage milestones
 - [`docs/TEST_PLAN.md`](docs/TEST_PLAN.md) — Multi-tier testing strategy and verification plans
+- [`docs/NATIVE_MODULES.md`](docs/NATIVE_MODULES.md) — Native module ABI architecture (`better-sqlite3`), dual runtime workflow, and troubleshooting
 
 The README provides the project overview and practical setup information; the `docs/` directory contains the deeper technical specifications.
 

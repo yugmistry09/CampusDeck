@@ -323,4 +323,5 @@ npm run package    # electron-builder packages into .deb / .AppImage (Linux)
 
 - `electron-builder.yml` specifies Linux AppImage and deb targets.
 - Embedded SQL migrations provide an automated fallback if migration files are isolated from binary bundles.
+- Native module `better-sqlite3` uses dual runtime ABIs: `npm run rebuild-electron` for Electron ABI 130 and `npm run rebuild-node` for Node ABI 127 (see [`docs/NATIVE_MODULES.md`](docs/NATIVE_MODULES.md) and decision `D-016`).
 
