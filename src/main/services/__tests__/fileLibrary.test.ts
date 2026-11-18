@@ -1,4 +1,18 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+
+vi.mock('electron', () => ({
+  shell: {
+    openPath: vi.fn().mockResolvedValue(''),
+    showItemInFolder: vi.fn()
+  },
+  dialog: {
+    showOpenDialog: vi.fn()
+  },
+  BrowserWindow: {
+    getFocusedWindow: vi.fn()
+  }
+}))
+
 import Database from 'better-sqlite3'
 import { join } from 'path'
 import { writeFileSync, existsSync, mkdirSync, rmSync } from 'fs'
@@ -136,5 +150,24 @@ describe('File Library Service', () => {
     await expect(
       fileLibrary.openDocumentInDefaultApp('00000000-0000-0000-0000-000000000000')
     ).rejects.toThrow(/Document with ID .* was not found/)
+  })
+
+  it('rejects revealing a non-existent document ID', () => {
+    expect(() => {
+      fileLibrary.revealInFolder('00000000-0000-0000-0000-000000000000')
+    }).toThrow(/Document with ID .* was not found/)
+  })
+
+  it('reveals a valid existing document in folder', () => {
+    const testFile = join(testTempDir, 'ToReveal.pdf')
+    writeFileSync(testFile, 'Reveal content')
+    const doc = fileLibrary.importFile(testFile)
+
+    expect(() => {
+      fileLibrary.revealInFolder(doc.id)
+    }).not.toThrow()
+
+    // Clean up
+    fileLibrary.deleteDocument(doc.id)
   })
 })

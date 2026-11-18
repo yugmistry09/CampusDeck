@@ -16,7 +16,8 @@ import {
   Eye,
   Unlink,
   FileQuestion,
-  Tag
+  Tag,
+  FolderOpen
 } from 'lucide-react'
 import type {
   TaskWithSubject,
@@ -30,6 +31,7 @@ import { ConfirmModal } from '../components/ConfirmModal'
 import { TaskAttachmentModal } from '../components/TaskAttachmentModal'
 import { TaskAttachmentEditModal } from '../components/TaskAttachmentEditModal'
 import { PdfViewer, type PdfViewerAttachmentItem } from '../components/PdfViewer'
+import { MissingFileModal, type MissingDocumentTarget } from '../components/MissingFileModal'
 
 interface TaskDetailPageProps {
   taskId: string
@@ -126,6 +128,7 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({
   const [attachmentToDelete, setAttachmentToDelete] = useState<TaskDocumentRecord | null>(null)
   const [deleteRefInfo, setDeleteRefInfo] = useState<DocumentRefCount | null>(null)
   const [activePdfDoc, setActivePdfDoc] = useState<PdfViewerAttachmentItem | null>(null)
+  const [missingDocTarget, setMissingDocTarget] = useState<MissingDocumentTarget | null>(null)
 
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
@@ -261,6 +264,18 @@ const counts = useMemo(() => {
 
   // Open document in app (for PDF) or default app (for others)
   const handleOpenDocument = (doc: TaskDocumentRecord) => {
+    if (doc.file_exists === false) {
+      setMissingDocTarget({
+        id: doc.id,
+        document_id: doc.document_id,
+        display_name: doc.display_name,
+        task_id: taskId,
+        role: doc.role,
+        variant_label: doc.variant_label
+      })
+      return
+    }
+
     const isPdf =
       doc.display_name.toLowerCase().endsWith('.pdf') ||
       doc.role === 'assignment_file' ||
@@ -281,13 +296,71 @@ const counts = useMemo(() => {
 
   // Open file in OS default application
   const handleOpenInDefaultApp = async (doc: TaskDocumentRecord) => {
+    if (doc.file_exists === false) {
+      setMissingDocTarget({
+        id: doc.id,
+        document_id: doc.document_id,
+        display_name: doc.display_name,
+        task_id: taskId,
+        role: doc.role,
+        variant_label: doc.variant_label
+      })
+      return
+    }
+
     try {
       await window.campusDeckAPI.files.openDocument(doc.document_id)
     } catch (err) {
-      setNotification({
-        type: 'error',
-        message: err instanceof Error ? err.message : 'Could not open file in default application.'
+      if (err instanceof Error && err.message.toLowerCase().includes('missing')) {
+        setMissingDocTarget({
+          id: doc.id,
+          document_id: doc.document_id,
+          display_name: doc.display_name,
+          task_id: taskId,
+          role: doc.role,
+          variant_label: doc.variant_label
+        })
+      } else {
+        setNotification({
+          type: 'error',
+          message: err instanceof Error ? err.message : 'Could not open file in default application.'
+        })
+      }
+    }
+  }
+
+  // Reveal file in OS file manager with selection/highlight
+  const handleRevealInFolder = async (doc: TaskDocumentRecord) => {
+    if (doc.file_exists === false) {
+      setMissingDocTarget({
+        id: doc.id,
+        document_id: doc.document_id,
+        display_name: doc.display_name,
+        task_id: taskId,
+        role: doc.role,
+        variant_label: doc.variant_label
       })
+      return
+    }
+
+    try {
+      await window.campusDeckAPI.files.revealInFolder(doc.document_id)
+    } catch (err) {
+      if (err instanceof Error && err.message.toLowerCase().includes('missing')) {
+        setMissingDocTarget({
+          id: doc.id,
+          document_id: doc.document_id,
+          display_name: doc.display_name,
+          task_id: taskId,
+          role: doc.role,
+          variant_label: doc.variant_label
+        })
+      } else {
+        setNotification({
+          type: 'error',
+          message: err instanceof Error ? err.message : 'Could not locate file in local vault.'
+        })
+      }
     }
   }
 
@@ -746,10 +819,24 @@ const counts = useMemo(() => {
 
                         {/* File Missing Badge */}
                         {isMissing && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-100 text-rose-700 dark:bg-rose-950/70 dark:text-rose-300">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setMissingDocTarget({
+                                id: doc.id,
+                                document_id: doc.document_id,
+                                display_name: doc.display_name,
+                                task_id: taskId,
+                                role: doc.role,
+                                variant_label: doc.variant_label
+                              })
+                            }
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-100 text-rose-700 dark:bg-rose-950/70 dark:text-rose-300 hover:bg-rose-200 transition-colors"
+                            title="Click to resolve missing file"
+                          >
                             <AlertTriangle className="w-2.5 h-2.5 text-rose-600" />
                             <span>Missing from vault</span>
-                          </span>
+                          </button>
                         )}
                       </div>
 
@@ -788,16 +875,32 @@ const counts = useMemo(() => {
                         >
                           <ExternalLink className="w-4 h-4" />
                         </button>
+                        <button
+                          onClick={() => handleRevealInFolder(doc)}
+                          title="Reveal in file explorer (selection highlighted)"
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                        >
+                          <FolderOpen className="w-4 h-4" />
+                        </button>
                       </>
                     ) : (
-                      <button
-                        onClick={() => handleOpenInDefaultApp(doc)}
-                        title="Open with default application"
-                        className="px-2 py-1 rounded-lg text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5 text-xs font-medium border border-slate-200 dark:border-slate-700"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                        <span>Open with default app</span>
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleOpenInDefaultApp(doc)}
+                          title="Open with default application"
+                          className="px-2 py-1 rounded-lg text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5 text-xs font-medium border border-slate-200 dark:border-slate-700"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>Open with default app</span>
+                        </button>
+                        <button
+                          onClick={() => handleRevealInFolder(doc)}
+                          title="Reveal in file explorer (selection highlighted)"
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                        >
+                          <FolderOpen className="w-4 h-4" />
+                        </button>
+                      </>
                     )}
                     <button
                       onClick={() => setEditingAttachment(doc)}
@@ -934,6 +1037,28 @@ const counts = useMemo(() => {
         isDestructive={true}
         onConfirm={handleDeleteTask}
         onCancel={() => setIsDeleteModalOpen(false)}
+      />
+
+      {/* Missing File Resolver Modal */}
+      <MissingFileModal
+        isOpen={Boolean(missingDocTarget)}
+        target={missingDocTarget}
+        onClose={() => setMissingDocTarget(null)}
+        onResolved={(action) => {
+          loadAttachments()
+          if (action === 'reimported') {
+            setNotification({
+              type: 'success',
+              message: `Replacement file imported for "${missingDocTarget?.display_name}".`
+            })
+          } else {
+            setNotification({
+              type: 'success',
+              message: `Missing attachment "${missingDocTarget?.display_name}" removed from task.`
+            })
+          }
+          setMissingDocTarget(null)
+        }}
       />
     </div>
   )

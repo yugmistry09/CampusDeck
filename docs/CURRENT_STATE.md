@@ -5,7 +5,7 @@
 
 ---
 
-## Snapshot Date: 2026-11-17 (v0.2.0 Foundation Phase)
+## Snapshot Date: 2026-11-17 (v0.2.0 Phase 2 Academic Document Workflow)
 
 ---
 
@@ -17,7 +17,7 @@
 | Desktop Runtime | ✅ Complete | Electron v33.4.11, electron-vite v2.3.0, TypeScript v5.6.3 (strict mode) |
 | UI Framework & Styling | ✅ Complete | React 18, Tailwind CSS 3.4 (dark mode `class` strategy), Lucide Icons, responsive shell |
 | Security Boundary | ✅ Complete | `nodeIntegration: false`, `contextIsolation: true`, `sandbox: true`, restrictive CSP with `worker-src 'self' blob:` and `connect-src 'none'`, `assertTrustedSender` window verification |
-| Preload API | ✅ Complete | Narrow, typed `contextBridge` exposing `window.campusDeckAPI` (including `calendarEvents`, `taskReminders`, `workSessions`, `taskDocs`, `pdf`, `backup`) |
+| Preload API | ✅ Complete | Narrow, typed `contextBridge` exposing `window.campusDeckAPI` (including `calendarEvents`, `taskReminders`, `workSessions`, `taskDocs`, `files` with `revealInFolder` & `pickFiles`, `pdf`, `backup`) |
 | Storage Location | ✅ Complete | Dedicated directory beneath `userData`: `<userData>/campusdeck_storage/` (db, library, backups) |
 | Database Engine | ✅ Complete | SQLite via `better-sqlite3` (11.10.0) in WAL mode, `foreign_keys = ON`, `synchronous = NORMAL` |
 | Migrations | ✅ Complete | 4 versioned migrations (`001_initial.sql`, `002_subject_fields_and_categories.sql`, `003_task_attachment_roles.sql`, `004_calendar_reminders_work_sessions.sql`) with `schema_migrations` tracking & embedded fallback |
@@ -27,6 +27,10 @@
 | Subject Management | ✅ Complete | Full CRUD with validation, code, semester, color picker, notes, stats, and delete confirmation |
 | Subject Drill-down View | ✅ Complete | Detail view with Overview, Files tab with category filtering, and integrated Tasks tab with attachment previews |
 | Task Model & CRUD | ✅ Complete | Single source of truth across all 7 types (`general`, `assignment`, `lab_manual`, `practical`, `project`, `exam_prep`, `other`), 3 statuses (`todo`, `in_progress`, `completed`), 3 priorities (`low`, `medium`, `high`), due date (`YYYY-MM-DD`), and archive state |
+| Task Creation File Attachment | ✅ Complete | In-modal file staging and attachment directly in `TaskModal` during task creation, linking question sheets/solutions seamlessly |
+| Drag-and-Drop & Dashed Dropzones | ✅ Complete | Interactive dashed dropzones in `TaskModal`, `TaskAttachmentModal`, and `DocumentUploadModal` with drag-over visual feedback and click-to-browse |
+| OS File Explorer Reveal | ✅ Complete | `files.revealInFolder` via `shell.showItemInFolder(fullPath)` opening the native file manager with the file selected/highlighted |
+| Missing File Resolution Workflow | ✅ Complete | `MissingFileModal` providing one-click Re-import/Replace (with role/variant preservation), Unlink/Remove, and Cancel |
 | Unified To-Do List | ✅ Complete | Unified tasks view with status tabs, subject & type dropdowns, due-date condition filters, search bar, and multi-criteria sorting |
 | Local Overdue Calculation | ✅ Complete | Evaluated against local calendar date (`DATE('now', 'localtime')`); completed and archived tasks excluded |
 | Real Dashboard Metrics | ✅ Complete | Open tasks, due soon (≤7d), overdue, completed, overall progress bar (D-008 formula), upcoming deadlines, and per-subject progress |
@@ -48,7 +52,7 @@
 | Document Opening | ✅ Complete | Secure `shell.openPath` via verified document ID only (never raw path from renderer) |
 | Non-Task Files Library | ✅ Complete | Subject Files tab and global All Files page with category tags, search, and delete |
 | Deletion Safeguards | ✅ Complete | Subject deletion sets `tasks.subject_id = NULL` (preserves tasks per D-006) and safely cleans unreferenced files; task deletion cascades reminders/sessions and preserves calendar events per D-015 |
-| Automated Tests | ✅ Complete | Vitest unit, repository, service, IPC validation, stepwise migration, and domain calculation test suites (18 test suites, 138 tests passing, 100% green) |
+| Automated Tests | ✅ Complete | Vitest unit, repository, service, IPC validation, stepwise migration, and domain calculation test suites (18 test suites, 140 tests passing, 100% green) |
 | Release Hardening & Packaging | ✅ Complete | Window open denial, navigation block, embedded SQL migration fallback, ESLint flat config, Linux AppImage & .deb packages |
 
 ---

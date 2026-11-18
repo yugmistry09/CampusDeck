@@ -393,6 +393,26 @@ export function createFileLibraryService(
     },
 
     /**
+     * Opens the OS file explorer at the file's location with the file highlighted/selected.
+     */
+    revealInFolder(documentId: string): void {
+      const doc = documentRepo.getDocumentById(documentId)
+      if (!doc) {
+        throw new Error(`Document with ID "${documentId}" was not found.`)
+      }
+
+      const fullPath = assertSafeRelativePath(doc.relative_path)
+
+      if (!existsSync(fullPath)) {
+        throw new Error(
+          `The file "${doc.display_name}" is missing from the local vault storage. It may have been deleted externally.`
+        )
+      }
+
+      shell.showItemInFolder(fullPath)
+    },
+
+    /**
      * Resolves the absolute path for a relative path strictly within libraryRoot.
      * Only used by main process.
      */

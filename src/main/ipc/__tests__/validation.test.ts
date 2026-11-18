@@ -25,6 +25,7 @@ import {
   settingsUpdateSchema,
   importSubjectDocSchema,
   importTaskDocSchema,
+  pickFilesSchema,
   calendarEventCreateSchema,
   calendarEventUpdateSchema,
   taskReminderCreateSchema,
@@ -206,16 +207,27 @@ describe('IPC Payload Validation & Schemas', () => {
       const importTask = parseOrThrow(importTaskDocSchema, {
         taskId: '123e4567-e89b-12d3-a456-426614174000',
         role: 'solution',
-        variantLabel: 'Key'
+        variantLabel: 'Key',
+        filePaths: ['/tmp/assignment.pdf', '/tmp/solution2.pdf']
       })
       expect(importTask.variantLabel).toBe('Key')
+      expect(importTask.filePaths).toHaveLength(2)
 
       const importSubject = parseOrThrow(importSubjectDocSchema, {
         subjectId: '123e4567-e89b-12d3-a456-426614174000',
         title: 'Syllabus 2026',
-        type: 'syllabus'
+        type: 'syllabus',
+        filePath: '/tmp/syllabus.pdf'
       })
       expect(importSubject.title).toBe('Syllabus 2026')
+      expect(importSubject.filePath).toBe('/tmp/syllabus.pdf')
+
+      const picked = parseOrThrow(pickFilesSchema, {
+        allowMultiple: true,
+        title: 'Select Assignment Files'
+      })
+      expect(picked?.allowMultiple).toBe(true)
+      expect(picked?.title).toBe('Select Assignment Files')
     })
   })
 

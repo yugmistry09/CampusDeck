@@ -20,7 +20,9 @@ import type {
   TaskDocumentUpdateInput,
   TaskDocumentDeleteResult,
   ImportTaskDocInput,
+  ImportTaskDocBlobInput,
   DocumentRefCount,
+  NativePickedFile,
   PdfDocumentMetadata,
   StorageUsageInfo,
   BackupExportResult,
@@ -142,6 +144,11 @@ const api = {
         'task-doc:select-and-import',
         input
       ),
+    importFromBlob: (input: ImportTaskDocBlobInput) =>
+      invoke<{ canceled: boolean; documents?: TaskDocumentRecord[] }>(
+        'task-doc:import-from-blob',
+        input
+      ),
     update: (input: TaskDocumentUpdateInput) =>
       invoke<TaskDocumentRecord | null>('task-doc:update', input),
     unlink: (id: string) =>
@@ -168,8 +175,23 @@ const api = {
         'file:select-and-import-subject-doc',
         input
       ),
+    importFromBlob: (input: {
+      subjectId: string
+      title: string
+      type: string
+      description?: string
+      files: Array<{ name: string; mimeType: string; arrayBuffer: ArrayBuffer }>
+    }) =>
+      invoke<{ canceled: boolean; document?: SubjectDocumentRecord }>(
+        'file:import-from-blob',
+        input
+      ),
     openDocument: (documentId: string) =>
-      invoke<{ success: boolean }>('file:open-document', { documentId })
+      invoke<{ success: boolean }>('file:open-document', { documentId }),
+    revealInFolder: (documentId: string) =>
+      invoke<{ success: boolean }>('file:reveal-in-folder', { documentId }),
+    pickFiles: (options?: { allowMultiple?: boolean; title?: string }) =>
+      invoke<{ canceled: boolean; files?: NativePickedFile[] }>('file:pick-files', options)
   },
 
   pdf: {

@@ -140,8 +140,16 @@ export const importSubjectDocSchema = z.object({
   subjectId: uuidSchema,
   title: z.string().trim().min(1).max(500),
   type: subjectDocTypeSchema,
-  description: z.string().max(10000).optional()
+  description: z.string().max(10000).optional(),
+  filePath: z.string().min(1).optional()
 })
+
+export const pickFilesSchema = z
+  .object({
+    allowMultiple: z.boolean().optional(),
+    title: z.string().max(200).optional()
+  })
+  .optional()
 
 export const documentIdSchema = z.object({ documentId: uuidSchema })
 
@@ -174,7 +182,22 @@ export const importTaskDocSchema = z.object({
   taskId: uuidSchema,
   role: taskDocumentRoleSchema,
   variantLabel: z.string().trim().max(100).nullable().optional(),
-  customDisplayName: z.string().trim().max(255).optional()
+  customDisplayName: z.string().trim().max(255).optional(),
+  filePaths: z.array(z.string().min(1)).optional()
+})
+
+export const importTaskDocBlobSchema = z.object({
+  taskId: uuidSchema,
+  role: taskDocumentRoleSchema,
+  variantLabel: z.string().trim().max(100).nullable().optional(),
+  customDisplayName: z.string().trim().max(255).optional(),
+  files: z.array(
+    z.object({
+      name: z.string().min(1),
+      mimeType: z.string().min(1),
+      arrayBuffer: z.instanceof(ArrayBuffer)
+    })
+  ).min(1)
 })
 
 export const documentRefCountSchema = z.object({

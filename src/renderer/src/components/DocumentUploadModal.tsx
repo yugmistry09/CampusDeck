@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
-import { X, UploadCloud, FileText, CheckCircle2 } from 'lucide-react'
+import { X, UploadCloud, FileText, CheckCircle2, Trash2 } from 'lucide-react'
 import type { SubjectDocumentType, SubjectDocumentRecord } from '@shared/types'
+import { FileDropzone, type DroppedFileInfo } from './FileDropzone'
 
 interface DocumentUploadModalProps {
   isOpen: boolean
@@ -32,6 +33,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   const [description, setDescription] = useState('')
   const [isImporting, setIsImporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [stagedFile, setStagedFile] = useState<DroppedFileInfo | null>(null)
 
   if (!isOpen) return null
 
@@ -45,27 +47,97 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
 
     try {
       setIsImporting(true)
-      const res = await window.campusDeckAPI.files.selectAndImportSubjectDoc({
-        subjectId,
-        title: trimmedTitle,
-        type: category,
-        description: description.trim()
-      })
 
-      if (res.canceled) {
-        setIsImporting(false)
-        return
-      }
+      if (stagedFile) {
+        // Import the staged (drag-dropped) file instead of opening a dialog
+        const primary = stagedFile
+        const finalTitle = trimmedTitle || primary.name
 
-      if (res.document) {
-        onUploaded(res.document)
-        onClose()
+        if (primary.arrayBuffer) {
+          const res = await window.campusDeckAPI.files.importFromBlob({
+            subjectId,
+            title: finalTitle,
+            type: category,
+            description: description.trim(),
+            files: [{
+              name: primary.name,
+              mimeType: primary.file?.type || '',
+              arrayBuffer: primary.arrayBuffer
+            }]
+          })
+
+          if (res.canceled) {
+            return
+          }
+
+          if (res.document) {
+            onUploaded(res.document)
+            onClose()
+            setStagedFile(null)
+          }
+        } else if (primary.path) {
+          const res = await window.campusDeckAPI.files.selectAndImportSubjectDoc({
+            subjectId,
+            title: finalTitle,
+            type: category,
+            description: description.trim(),
+            filePath: primary.path
+          })
+
+          if (res.canceled) {
+            return
+          }
+
+          if (res.document) {
+            onUploaded(res.document)
+            onClose()
+            setStagedFile(null)
+          }
+        } else {
+          setError('Unable to import the staged file. Please click to browse instead.')
+          return
+        }
+      } else {
+        // No staged file: open the native file dialog
+        const res = await window.campusDeckAPI.files.selectAndImportSubjectDoc({
+          subjectId,
+          title: trimmedTitle,
+          type: category,
+          description: description.trim()
+        })
+
+        if (res.canceled) {
+          return
+        }
+
+        if (res.document) {
+          onUploaded(res.document)
+          onClose()
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import failed.')
     } finally {
       setIsImporting(false)
     }
+  }
+
+  const handleFilesDropped = async (files: DroppedFileInfo[]) => {
+    if (files.length === 0) return
+    // Stage the dropped file instead of importing immediately.
+    // The file will be imported when the user clicks "Select File & Import".
+    const dropped = files[0]!
+    setStagedFile(dropped)
+    setError(null)
+    // Pre-fill the title from the dropped filename if not already set
+    if (!title.trim()) {
+      setTitle(dropped.name)
+    }
+  }
+
+  const handleRemoveStagedFile = () => {
+    setStagedFile(null)
+    setError(null)
   }
 
   return (
@@ -171,6 +243,42 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
               className="w-full px-3 py-2 rounded-lg text-sm bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
             />
           </div>
+
+          {/* Staged drag-dropped file preview (shown after a drop, before import) */}
+          {stagedFile && (
+            <div className="p-3 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/20 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <FileText className="w-4 h-4 text-indigo-500 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate" title={stagedFile.name}>
+                    {stagedFile.name}
+                  </p>
+                  <p className="text-[10px] text-slate-500 truncate" title="Staged — will import on upload">
+                    Staged · Ready to import on upload
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleRemoveStagedFile}
+                className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors"
+                title="Remove staged file"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Dashed Dropzone Box (highlighted with dashed lines, also triggers file dialog on click) */}
+          <FileDropzone
+            title="Drag & drop subject document here, or click to browse"
+            subtitle={stagedFile ? 'A file is staged above. Click "Select File & Import" to upload.' : 'Clicking opens your system file dialog; dropping stages the file.'}
+            allowMultiple={false}
+            disabled={isImporting}
+            onClickBrowse={handleSelectAndImport}
+            onFilesSelected={handleFilesDropped}
+            className="my-1"
+          />
 
           {/* Supported Formats Info */}
           <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 flex items-start gap-2.5">

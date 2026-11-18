@@ -350,11 +350,19 @@ export interface SubjectDocumentUpdateInput {
   description?: string
 }
 
+export interface NativePickedFile {
+  filePath: string
+  fileName: string
+  fileSize: number
+  mimeType: string
+}
+
 export interface ImportSubjectDocInput {
   subjectId: string
   title: string
   type: SubjectDocumentType
   description?: string
+  filePath?: string
 }
 
 export interface TaskDocumentUpdateInput {
@@ -375,6 +383,19 @@ export interface ImportTaskDocInput {
   role: TaskDocumentRole
   variantLabel?: string | null
   customDisplayName?: string
+  filePaths?: string[]
+}
+
+export interface ImportTaskDocBlobInput {
+  taskId: string
+  role: TaskDocumentRole
+  variantLabel?: string | null
+  customDisplayName?: string
+  files: Array<{
+    name: string
+    mimeType: string
+    arrayBuffer: ArrayBuffer
+  }>
 }
 
 export interface DocumentRefCount {

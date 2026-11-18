@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { X, Calendar, AlertCircle } from 'lucide-react'
+import { X, Calendar, AlertCircle, Paperclip, FileText, Tag, Plus, Trash2 } from 'lucide-react'
 import type {
   TaskRow,
   TaskWithSubject,
@@ -8,8 +8,10 @@ import type {
   TaskStatus,
   SubjectRow,
   TaskCreateInput,
-  TaskUpdateInput
+  TaskUpdateInput,
+  TaskDocumentRole
 } from '@shared/types'
+import { FileDropzone, type DroppedFileInfo } from './FileDropzone'
 
 interface TaskModalProps {
   isOpen: boolean
@@ -57,6 +59,19 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [status, setStatus] = useState<TaskStatus>('todo')
   const [description, setDescription] = useState('')
 
+  interface StagedFile {
+    id: string
+    filePath: string
+    fileName: string
+    fileSize?: number
+    role: TaskDocumentRole
+    variantLabel?: string
+    // For drag-and-dropped files that don't have a native file path
+    file?: File
+    arrayBuffer?: ArrayBuffer
+  }
+
+  const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([])
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -89,8 +104,104 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setStatus('todo')
       setDescription('')
     }
+    setStagedFiles([])
     setError(null)
   }, [task, defaultSubjectId, isOpen])
+
+  const handleFilesAdded = (files: DroppedFileInfo[]) => {
+    const defaultRole: TaskDocumentRole =
+      type === 'assignment' || type === 'lab_manual' ? 'assignment_file' : 'reference'
+
+    // Accept files from both the native file dialog (have a path) and drag-and-drop
+    // (have a File object / arrayBuffer but no path). Drag-dropped files will be
+    // imported via blob when the task is saved.
+    const newStaged: StagedFile[] = files
+      .filter((f) => f.path || f.file || f.arrayBuffer)
+      .map((f) => ({
+        id: `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        filePath: f.path || '',
+        fileName: f.name,
+        fileSize: f.size,
+        role: defaultRole,
+        variantLabel: '',
+        file: f.file,
+        arrayBuffer: f.arrayBuffer
+      }))
+
+    if (newStaged.length > 0) {
+      setStagedFiles((prev) => [...prev, ...newStaged])
+    } else {
+      setError('Could not process dropped files. Please ensure they are local files.')
+    }
+  }
+
+  const handlePickFilesToStage = async () => {
+    try {
+      const res = await window.campusDeckAPI.files.pickFiles({
+        allowMultiple: true,
+        title: 'Select File(s) to Attach to Task'
+      })
+      if (!res.canceled && res.files) {
+        handleFilesAdded(
+          res.files.map((f) => ({
+            path: f.filePath,
+            name: f.fileName,
+            size: f.fileSize
+          }))
+        )
+      }
+    } catch (err) {
+      console.error('Failed to pick files:', err)
+    }
+  }
+
+  const handleRemoveStagedFile = (id: string) => {
+    setStagedFiles((prev) => prev.filter((f) => f.id !== id))
+  }
+
+  const importStagedFile = async (taskId: string, file: StagedFile) => {
+    const variantLabel =
+      file.role === 'solution' && file.variantLabel?.trim()
+        ? file.variantLabel.trim()
+        : null
+
+    // Drag-and-dropped files have no native path; import them via blob.
+    if (file.arrayBuffer) {
+      await window.campusDeckAPI.taskDocs.importFromBlob({
+        taskId,
+        role: file.role,
+        variantLabel,
+        customDisplayName: file.fileName,
+        files: [{
+          name: file.fileName,
+          mimeType: file.file?.type || '',
+          arrayBuffer: file.arrayBuffer
+        }]
+      })
+    } else if (file.filePath) {
+      await window.campusDeckAPI.taskDocs.selectAndImport({
+        taskId,
+        filePaths: [file.filePath],
+        role: file.role,
+        variantLabel,
+        customDisplayName: file.fileName
+      })
+    } else {
+      throw new Error(`Cannot import "${file.fileName}": no file path or data available.`)
+    }
+  }
+
+  const handleUpdateStagedRole = (id: string, newRole: TaskDocumentRole) => {
+    setStagedFiles((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, role: newRole } : f))
+    )
+  }
+
+  const handleUpdateStagedVariant = (id: string, variant: string) => {
+    setStagedFiles((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, variantLabel: variant } : f))
+    )
+  }
 
   if (!isOpen) return null
 
@@ -129,6 +240,15 @@ export const TaskModal: React.FC<TaskModalProps> = ({
         }
         const updated = await window.campusDeckAPI.tasks.update(updateInput)
         if (updated) {
+          if (stagedFiles.length > 0) {
+            for (const file of stagedFiles) {
+              try {
+                await importStagedFile(updated.id, file)
+              } catch (importErr) {
+                console.error('Failed to attach file to updated task:', importErr)
+              }
+            }
+          }
           onSaved(updated)
           onClose()
         }
@@ -143,6 +263,15 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           description: description.trim()
         }
         const created = await window.campusDeckAPI.tasks.create(createInput)
+        if (created && stagedFiles.length > 0) {
+          for (const file of stagedFiles) {
+            try {
+              await importStagedFile(created.id, file)
+            } catch (importErr) {
+              console.error('Failed to attach file to newly created task:', importErr)
+            }
+          }
+        }
         onSaved(created)
         onClose()
       }
@@ -316,6 +445,101 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Requirements, problem numbers, or submission instructions..."
               className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+            />
+          </div>
+
+          {/* Attachments & Coursework Files (Optional) */}
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <Paperclip className="w-3.5 h-3.5 text-indigo-500" />
+                <span>Coursework Files & Attachments</span>
+                {stagedFiles.length > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-indigo-100 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold">
+                    {stagedFiles.length}
+                  </span>
+                )}
+              </label>
+
+              <button
+                type="button"
+                onClick={handlePickFilesToStage}
+                className="px-2.5 py-1 rounded-lg text-xs font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors flex items-center gap-1 border border-indigo-200 dark:border-indigo-800/60"
+              >
+                <Plus className="w-3 h-3" />
+                <span>Attach File</span>
+              </button>
+            </div>
+
+            {/* Staged files list */}
+            {stagedFiles.length > 0 && (
+              <div className="space-y-2">
+                {stagedFiles.map((file) => (
+                  <div
+                    key={file.id}
+                    className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-50/60 dark:bg-slate-800/40 space-y-2 text-xs"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileText className="w-4 h-4 text-indigo-500 shrink-0" />
+                        <span className="font-medium text-slate-800 dark:text-slate-200 truncate" title={file.fileName}>
+                          {file.fileName}
+                        </span>
+                        {file.fileSize ? (
+                          <span className="text-[10px] text-slate-400 shrink-0">
+                            ({(file.fileSize / 1024).toFixed(0)} KB)
+                          </span>
+                        ) : null}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveStagedFile(file.id)}
+                        className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors"
+                        title="Remove file"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-slate-200/50 dark:border-slate-700/50">
+                      <span className="text-[10px] text-slate-500 font-medium">Role:</span>
+                      <select
+                        value={file.role}
+                        onChange={(e) => handleUpdateStagedRole(file.id, e.target.value as TaskDocumentRole)}
+                        className="px-2 py-0.5 rounded text-[11px] border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      >
+                        <option value="assignment_file">Assignment / Prompt</option>
+                        <option value="solution">Solution Variant</option>
+                        <option value="reference">Reference Material</option>
+                        <option value="other">Other</option>
+                      </select>
+
+                      {file.role === 'solution' && (
+                        <div className="flex items-center gap-1 flex-1 min-w-[140px]">
+                          <Tag className="w-3 h-3 text-emerald-500 shrink-0" />
+                          <input
+                            type="text"
+                            value={file.variantLabel || ''}
+                            onChange={(e) => handleUpdateStagedVariant(file.id, e.target.value)}
+                            placeholder="Variant label (e.g. Draft 1)"
+                            className="w-full px-2 py-0.5 rounded text-[11px] border border-emerald-200 dark:border-emerald-800 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Dropzone area (dashed box, also clickable) */}
+            <FileDropzone
+              title="Drag & drop coursework files here, or click to attach"
+              subtitle="Assignments, question sheets, lab guides, or solutions"
+              allowMultiple={true}
+              onClickBrowse={handlePickFilesToStage}
+              onFilesSelected={handleFilesAdded}
+              className="py-4"
             />
           </div>
 

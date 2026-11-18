@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import {
   Files,
   Search,
@@ -9,9 +9,14 @@ import {
   FileText,
   Image as ImageIcon,
   FileSpreadsheet,
-  Presentation
+  Presentation,
+  FolderOpen
 } from 'lucide-react'
-import type { SubjectDocumentRecord, SubjectDocumentType } from '@shared/types'
+import type {
+  SubjectDocumentRecord,
+  SubjectDocumentType,
+  TaskDocumentRecord
+} from '@shared/types'
 import { ConfirmModal } from '../components/ConfirmModal'
 
 const CATEGORY_LABELS: Record<SubjectDocumentType, { label: string; badgeClass: string }> = {
@@ -29,19 +34,42 @@ const CATEGORY_LABELS: Record<SubjectDocumentType, { label: string; badgeClass: 
   },
   notice: {
     label: 'Notice',
-    badgeClass: 'bg-amber-100 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300'
+    badgeClass: 'bg-amber-100 text-amber-700 dark:bg-amber-950/70 dark:text-emerald-300'
   },
   reference: {
     label: 'Reference',
-    badgeClass: 'bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300'
+    badgeClass: 'bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-emerald-300'
   },
   timetable: {
     label: 'Timetable',
-    badgeClass: 'bg-purple-100 text-purple-700 dark:bg-purple-950/70 dark:text-purple-300'
+    badgeClass: 'bg-purple-100 text-purple-700 dark:bg-purple-950/70 dark:text-emerald-300'
   },
   notes: {
     label: 'Lecture Notes',
-    badgeClass: 'bg-teal-100 text-teal-700 dark:bg-teal-950/70 dark:text-teal-300'
+    badgeClass: 'bg-teal-100 text-teal-700 dark:bg-teal-950/70 dark:text-emerald-300'
+  },
+  other: {
+    label: 'Other',
+    badgeClass: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+  }
+}
+
+const TASK_ROLE_LABELS: Record<string, { label: string; badgeClass: string }> = {
+  assignment_file: {
+    label: 'Assignment',
+    badgeClass: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300'
+  },
+  assignment: {
+    label: 'Assignment',
+    badgeClass: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300'
+  },
+  solution: {
+    label: 'Solution',
+    badgeClass: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300'
+  },
+  reference: {
+    label: 'Reference',
+    badgeClass: 'bg-amber-100 text-amber-700 dark:bg-amber-950/70 dark:text-emerald-300'
   },
   other: {
     label: 'Other',
@@ -76,19 +104,43 @@ function getFileIcon(mimeType?: string | null, fileName?: string | null) {
   return <FileText className="w-4 h-4 text-indigo-500" />
 }
 
+interface UnifiedFileRecord {
+  id: string
+  source: 'subject' | 'task'
+  title: string
+  description?: string | null
+  typeBadge: { label: string; badgeClass: string }
+  displayName: string
+  mimeType: string | null
+  sizeBytes: number | null
+  createdAt: string
+  subjectName?: string | null
+  subjectCode?: string | null
+  subjectColor?: string | null
+  taskId?: string | null
+  variantLabel?: string | null
+  documentId?: string | null
+}
+
 export const AllFilesPage: React.FC = () => {
   const [documents, setDocuments] = useState<SubjectDocumentRecord[]>([])
+  const [taskDocuments, setTaskDocuments] = useState<TaskDocumentRecord[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  const [sourceFilter, setSourceFilter] = useState<string>('all')
   const [subjectFilter, setSubjectFilter] = useState<string>('all')
 
-  const [docToDelete, setDocToDelete] = useState<SubjectDocumentRecord | null>(null)
+  const [docToDelete, setDocToDelete] = useState<UnifiedFileRecord | null>(null)
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   const loadDocuments = useCallback(async () => {
     try {
-      const all = await window.campusDeckAPI.subjectDocs.listAll()
-      setDocuments(all)
+      const [allSubjectDocs, allTaskDocs] = await Promise.all([
+        window.campusDeckAPI.subjectDocs.listAll(),
+        window.campusDeckAPI.taskDocs.listAll()
+      ])
+      setDocuments(allSubjectDocs)
+      setTaskDocuments(allTaskDocs)
     } catch (err) {
       console.error('Failed to load documents:', err)
       setNotification({
@@ -102,10 +154,48 @@ export const AllFilesPage: React.FC = () => {
     loadDocuments()
   }, [loadDocuments])
 
-  const handleOpenDocument = async (doc: SubjectDocumentRecord) => {
-    if (!doc.document_id) return
+  // Normalize subject documents and task documents into a unified display shape
+  const unifiedFiles: UnifiedFileRecord[] = useMemo(() => {
+    const subjectFiles: UnifiedFileRecord[] = documents.map((doc) => ({
+      id: doc.id,
+      source: 'subject' as const,
+      title: doc.title,
+      description: doc.description || undefined,
+      typeBadge: (CATEGORY_LABELS[doc.type] ?? CATEGORY_LABELS.other)!,
+      displayName: doc.display_name || '',
+      mimeType: doc.mime_type || null,
+      sizeBytes: doc.size_bytes || null,
+      createdAt: doc.created_at,
+      subjectName: doc.subject_name || null,
+      subjectCode: doc.subject_code || null,
+      subjectColor: doc.subject_color || null,
+      documentId: doc.document_id || undefined
+    }))
+
+    const taskFiles: UnifiedFileRecord[] = taskDocuments.map((doc) => ({
+      id: doc.id,
+      source: 'task' as const,
+      title: doc.display_name,
+      description: doc.variant_label ? `Variant: ${doc.variant_label}` : undefined,
+      typeBadge: (TASK_ROLE_LABELS[doc.role] ?? TASK_ROLE_LABELS.other)!,
+      displayName: doc.display_name,
+      mimeType: doc.mime_type || null,
+      sizeBytes: doc.size_bytes || null,
+      createdAt: doc.created_at,
+      taskId: doc.task_id || undefined,
+      variantLabel: doc.variant_label || undefined,
+      documentId: doc.document_id || undefined
+    }))
+
+    return [...subjectFiles, ...taskFiles].sort((a, b) => {
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    })
+  }, [documents, taskDocuments])
+
+  const handleOpenDocument = async (doc: UnifiedFileRecord) => {
+    if (!doc.documentId) return
     try {
-      await window.campusDeckAPI.files.openDocument(doc.document_id)
+      await window.campusDeckAPI.files.openDocument(doc.documentId)
     } catch (err) {
       setNotification({
         type: 'error',
@@ -114,17 +204,39 @@ export const AllFilesPage: React.FC = () => {
     }
   }
 
-  const handleDeleteDocument = async () => {
-    if (!docToDelete) return
+  const handleRevealDocument = async (doc: UnifiedFileRecord) => {
+    if (!doc.documentId) return
     try {
-      await window.campusDeckAPI.subjectDocs.delete(docToDelete.id)
-      setDocToDelete(null)
-      loadDocuments()
-      setNotification({ type: 'success', message: `Document "${docToDelete.title}" removed.` })
+      await window.campusDeckAPI.files.revealInFolder(doc.documentId)
     } catch (err) {
       setNotification({
         type: 'error',
-        message: err instanceof Error ? err.message : 'Failed to delete document.'
+        message: err instanceof Error ? err.message : 'Could not locate file in local vault.'
+      })
+    }
+  }
+
+  const handleDeleteDocument = async () => {
+    if (!docToDelete) return
+    try {
+      if (docToDelete.source === 'subject') {
+        // Find the original subject document to delete by its DB id
+        const original = documents.find((d) => d.id === docToDelete.id)
+        if (original?.id) {
+          await window.campusDeckAPI.subjectDocs.delete(original.id)
+        }
+      } else {
+        // For task documents, we unlink from the task (preserves vault copy)
+        // Find by document_id using ref count to determine if safe
+        await window.campusDeckAPI.taskDocs.delete(docToDelete.id)
+      }
+      setDocToDelete(null)
+      loadDocuments()
+      setNotification({ type: 'success', message: `File "${docToDelete.title}" removed.` })
+    } catch (err) {
+      setNotification({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Failed to delete file.'
       })
     }
   }
@@ -138,18 +250,21 @@ export const AllFilesPage: React.FC = () => {
     ).values()
   )
 
-  const filteredDocs = documents.filter((doc) => {
+  const filteredDocs = unifiedFiles.filter((doc) => {
     const q = searchQuery.toLowerCase()
     const matchesSearch =
       doc.title.toLowerCase().includes(q) ||
       (doc.description && doc.description.toLowerCase().includes(q)) ||
-      (doc.display_name && doc.display_name.toLowerCase().includes(q)) ||
-      (doc.subject_name && doc.subject_name.toLowerCase().includes(q))
+      (doc.displayName && doc.displayName.toLowerCase().includes(q)) ||
+      (doc.subjectName && doc.subjectName.toLowerCase().includes(q))
 
-    const matchesCategory = categoryFilter === 'all' || doc.type === categoryFilter
-    const matchesSubject = subjectFilter === 'all' || doc.subject_id === subjectFilter
+    const badgeLabel = doc.typeBadge.label
+    const matchesCategorySimple = categoryFilter === 'all' || badgeLabel === categoryFilter
 
-    return matchesSearch && matchesCategory && matchesSubject
+    const matchesSource = sourceFilter === 'all' || doc.source === sourceFilter
+    const matchesSubject = subjectFilter === 'all' || doc.source !== 'subject' || (doc.subjectName ?? '').includes(subjectFilter)
+
+    return matchesSearch && matchesCategorySimple && matchesSource && matchesSubject
   })
 
   return (
@@ -171,10 +286,10 @@ export const AllFilesPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
         <div>
           <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-            All Reference & Subject Files
+            All Vault Files
           </h2>
           <p className="text-xs text-slate-500">
-            Search and view syllabus sheets, lecture notes, timetables, and circulars
+            Subject documents and task attachments stored in your local vault
           </p>
         </div>
 
@@ -213,25 +328,36 @@ export const AllFilesPage: React.FC = () => {
           />
         </div>
 
-        {/* Category Filter */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Filter className="w-4 h-4 text-slate-400 shrink-0" />
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
             className="px-3 py-2 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
           >
-            <option value="all">All Categories</option>
-            <option value="syllabus">Syllabus</option>
-            <option value="marks">Marks & Grades</option>
-            <option value="notice">Notices</option>
-            <option value="reference">Reference</option>
-            <option value="timetable">Timetable</option>
-            <option value="notes">Lecture Notes</option>
-            <option value="other">Other</option>
+            <option value="all">All Types</option>
+            {Object.values(CATEGORY_LABELS).map((cat) => (
+              <option key={cat.label} value={cat.label}>
+                {cat.label}
+              </option>
+            ))}
+            {Object.values(TASK_ROLE_LABELS).map((role) => (
+              <option key={role.label} value={role.label}>
+                {role.label}
+              </option>
+            ))}
           </select>
 
-          {/* Subject Filter */}
+          <select
+            value={sourceFilter}
+            onChange={(e) => setSourceFilter(e.target.value)}
+            className="px-3 py-2 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+          >
+            <option value="all">All Sources</option>
+            <option value="subject">Subject Documents</option>
+            <option value="task">Task Attachments</option>
+          </select>
+
           <select
             value={subjectFilter}
             onChange={(e) => setSubjectFilter(e.target.value)}
@@ -239,7 +365,7 @@ export const AllFilesPage: React.FC = () => {
           >
             <option value="all">All Subjects</option>
             {uniqueSubjects.map((sub) => (
-              <option key={sub.id} value={sub.id}>
+              <option key={sub.id} value={sub.name}>
                 {sub.code ? `${sub.code} - ${sub.name}` : sub.name}
               </option>
             ))}
@@ -248,17 +374,17 @@ export const AllFilesPage: React.FC = () => {
       </div>
 
       {/* Documents Table / List */}
-      {documents.length === 0 ? (
+      {unifiedFiles.length === 0 ? (
         <div className="p-14 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 flex flex-col items-center justify-center text-center">
           <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 mb-3">
             <Files className="w-6 h-6" />
           </div>
           <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-            No subject documents uploaded yet
+            No vault files yet
           </h3>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-sm">
-            Documents uploaded inside individual subjects (syllabuses, lab references, timetables)
-            will appear here in this unified vault directory.
+            Import subject documents (syllabuses, timetables, notes) or attach files to tasks
+            and assignments. Everything will appear here in your unified vault directory.
           </p>
         </div>
       ) : filteredDocs.length === 0 ? (
@@ -272,8 +398,9 @@ export const AllFilesPage: React.FC = () => {
               <thead>
                 <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 font-medium">
                   <th className="py-3 px-4">Document Title</th>
-                  <th className="py-3 px-4">Category</th>
-                  <th className="py-3 px-4">Subject</th>
+                  <th className="py-3 px-4">Source</th>
+                  <th className="py-3 px-4">Type / Role</th>
+                  <th className="py-3 px-4">Subject / Task</th>
                   <th className="py-3 px-4">Original File</th>
                   <th className="py-3 px-4">Size</th>
                   <th className="py-3 px-4 text-right">Actions</th>
@@ -281,7 +408,7 @@ export const AllFilesPage: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {filteredDocs.map((doc) => {
-                  const catMeta = CATEGORY_LABELS[doc.type] || CATEGORY_LABELS.other
+                  const isSubject = doc.source === 'subject'
                   return (
                     <tr
                       key={doc.id}
@@ -290,7 +417,7 @@ export const AllFilesPage: React.FC = () => {
                       {/* Title & Description */}
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2.5">
-                          {getFileIcon(doc.mime_type, doc.display_name)}
+                          {getFileIcon(doc.mimeType, doc.displayName)}
                           <div>
                             <p className="font-semibold text-slate-900 dark:text-slate-100">
                               {doc.title}
@@ -304,57 +431,88 @@ export const AllFilesPage: React.FC = () => {
                         </div>
                       </td>
 
-                      {/* Category Badge */}
+                      {/* Source Badge */}
                       <td className="py-3 px-4 whitespace-nowrap">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${catMeta.badgeClass}`}>
-                          {catMeta.label}
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                          isSubject
+                            ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
+                            : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                        }`}>
+                          {isSubject ? 'Subject' : 'Task'}
                         </span>
                       </td>
 
-                      {/* Subject Name / Code */}
+                      {/* Type / Role Badge */}
                       <td className="py-3 px-4 whitespace-nowrap">
-                        {doc.subject_name ? (
-                          <div className="flex items-center gap-1.5">
-                            <div
-                              className="w-2 h-2 rounded-full shrink-0"
-                              style={{ backgroundColor: doc.subject_color || '#4F46E5' }}
-                            />
-                            <span className="text-slate-700 dark:text-slate-300 font-medium">
-                              {doc.subject_code ? `${doc.subject_code} • ${doc.subject_name}` : doc.subject_name}
-                            </span>
-                          </div>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${doc.typeBadge.badgeClass}`}>
+                          {doc.typeBadge.label}
+                        </span>
+                        {doc.variantLabel && (
+                          <span className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                            {doc.variantLabel}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Subject / Task */}
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        {isSubject ? (
+                          doc.subjectName ? (
+                            <div className="flex items-center gap-1.5">
+                              <div
+                                className="w-2 h-2 rounded-full shrink-0"
+                                style={{ backgroundColor: doc.subjectColor || '#4F46E5' }}
+                              />
+                              <span className="text-slate-700 dark:text-slate-300 font-medium">
+                                {doc.subjectCode ? `${doc.subjectCode} • ${doc.subjectName}` : doc.subjectName}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 italic">Unassigned</span>
+                          )
                         ) : (
-                          <span className="text-slate-400 italic">Unassigned</span>
+                          <span className="text-slate-500 font-mono text-[11px] truncate" title={doc.taskId || ''}>
+                            Task: {(doc.taskId || '').slice(0, 8)}…
+                          </span>
                         )}
                       </td>
 
                       {/* Filename */}
-                      <td className="py-3 px-4 text-slate-500 font-mono text-[11px] max-w-[180px] truncate" title={doc.display_name || ''}>
-                        {doc.display_name || '—'}
+                      <td className="py-3 px-4 text-slate-500 font-mono text-[11px] max-w-[180px] truncate" title={doc.displayName || ''}>
+                        {doc.displayName || '—'}
                       </td>
 
                       {/* File Size */}
                       <td className="py-3 px-4 text-slate-400 whitespace-nowrap">
-                        {formatBytes(doc.size_bytes)}
+                        {formatBytes(doc.sizeBytes)}
                       </td>
 
                       {/* Actions */}
                       <td className="py-3 px-4 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1">
-                          {doc.document_id && (
-                            <button
-                              onClick={() => handleOpenDocument(doc)}
-                              className="px-2.5 py-1 rounded-md text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 transition-colors flex items-center gap-1"
-                              title="Open in default application"
-                            >
-                              <ExternalLink className="w-3 h-3" />
-                              <span>Open</span>
-                            </button>
+                          {doc.documentId && (
+                            <>
+                              <button
+                                onClick={() => handleOpenDocument(doc)}
+                                className="px-2.5 py-1 rounded-md text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 transition-colors flex items-center gap-1"
+                                title="Open in default application"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                <span>Open</span>
+                              </button>
+                              <button
+                                onClick={() => handleRevealDocument(doc)}
+                                className="p-1 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                title="Reveal in file explorer (selection highlighted)"
+                              >
+                                <FolderOpen className="w-3.5 h-3.5" />
+                              </button>
+                            </>
                           )}
                           <button
                             onClick={() => setDocToDelete(doc)}
                             className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors"
-                            title="Delete document"
+                            title="Delete file"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -372,10 +530,15 @@ export const AllFilesPage: React.FC = () => {
       {/* Confirm Delete Modal */}
       <ConfirmModal
         isOpen={Boolean(docToDelete)}
-        title="Delete Document"
-        message={`Are you sure you want to delete "${docToDelete?.title}"?`}
-        warningNote="The internal copy stored in your local library will be permanently removed."
-        confirmText="Delete Document"
+        title="Delete File"
+        message={`Are you sure you want to remove "${docToDelete?.title}"?`}
+        warningNote={
+          docToDelete?.source === 'task'
+            ? 'This will unlink the attachment from the task. The physical file in your vault will be preserved if it is referenced elsewhere.'
+            : 'The internal copy stored in your local library will be permanently removed.'
+        }
+        confirmText="Delete File"
+        isDestructive={true}
         onConfirm={handleDeleteDocument}
         onCancel={() => setDocToDelete(null)}
       />
